@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+.vscode/
+*.log
+.env
+
+# Market data never ships: LOBSTER and ITCH files are licensed/redistribution-
+# restricted, and TAQ is licensed. The dry-run fiction lives here too.
+data/
+
+# Published artifacts under results/ are whitelisted FILE BY FILE as they are
+# published -- the backtester's Day 12 lesson (three README figures and the
+# trial registry silently never committed) installed as policy from day one.
+results/*
+!results/.gitkeep

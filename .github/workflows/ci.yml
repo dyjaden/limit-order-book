@@ -1,0 +1,18 @@
+﻿name: ci
+
+# The stranger's path, run on every push: fresh checkout, fresh environment,
+# install, test. The backtester learned on its last day that a green local
+# suite proves nothing about what a clean clone can do; this project never
+# gets to forget it.
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q
