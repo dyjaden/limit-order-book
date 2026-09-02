@@ -8,4 +8,6 @@ event per message, and earns its claims the same way: against references,
 with the trial count attached.
 """
 
+from lob.book import Book, Fill, Order, PriceLevel, Side  # noqa: F401
+
 __version__ = "0.1.0"
