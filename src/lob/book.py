@@ -194,15 +194,32 @@ class Book:
         """Amend an order: cancel it, add it back. It rejoins at the BACK
         of its (possibly new) level -- queue position is lost by
         construction, which is the price-time rule working as law rather
-        than as something an implementation remembered to do."""
-        old = self.cancel(order_id)
-        try:
-            return self.add(order_id, old.side, new_price, new_qty)
-        except ValueError:
-            # the replacement was invalid (crossing, bad qty); the cancel
-            # half must not silently stand alone
-            self.add(old.order_id, old.side, old.price, old.qty)
-            raise
+        than as something an implementation remembered to do.
+
+        Validation happens BEFORE the cancel, because a REFUSED amend must
+        leave the original exactly where it stood, place in line included.
+        (The first cut rolled back by re-adding, which silently sent the
+        original to the back of its queue -- found by this week's own test
+        suite before any real data existed. Checking the crossing rule
+        first is sound: canceling this order cannot change the OTHER
+        side's best.)
+        """
+        old = self.order(order_id)
+        if new_qty <= 0:
+            raise ValueError(f"order {order_id}: quantity must be "
+                             f"positive, got {new_qty}")
+        if old.side is Side.BID:
+            ask = self.best_ask()
+            if ask is not None and new_price >= ask:
+                raise ValueError(f"replace of bid {order_id} to "
+                                 f"{new_price} would cross the ask {ask}")
+        else:
+            bid = self.best_bid()
+            if bid is not None and new_price <= bid:
+                raise ValueError(f"replace of ask {order_id} to "
+                                 f"{new_price} would cross the bid {bid}")
+        self.cancel(order_id)
+        return self.add(order_id, old.side, new_price, new_qty)
 
     def execute(self, side: Side, qty: Qty) -> list[Fill]:
         """Consume `qty` from the FRONT of `side`'s best queue, walking to
