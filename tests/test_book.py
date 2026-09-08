@@ -109,6 +109,35 @@ def test_replace_loses_queue_position():
     assert b.order(1).qty == 60        # A untouched, but now first in line
 
 
+def test_reduce_keeps_queue_position():
+    """The counterpart to replace, and the reason it exists. A(100) then
+    B(50); A reduces by 60. An execute of 60 must fill A first (its
+    remaining 40) and then B (20): A never left the front, and the level
+    total dropped by exactly the reduction."""
+    b = Book()
+    b.add(1, Side.BID, 9998, 100)      # A
+    b.add(2, Side.BID, 9998, 50)       # B
+    b.reduce(1, 60)
+    assert b.depth(Side.BID, 1) == [(9998, 90)]      # 40 + 50
+    assert len(b) == 2                               # nobody left
+    fills = b.execute(Side.BID, 60)
+    assert [(f.order_id, f.qty) for f in fills] == [(1, 40), (2, 20)]
+
+
+def test_reduce_refuses_the_hostile_cases():
+    """Unknown id, non-positive amount, and reduce-to-nothing (which is a
+    delete wearing a reduce's clothes) all refuse loudly."""
+    b = Book()
+    b.add(1, Side.ASK, 10001, 30)
+    with pytest.raises(KeyError, match="unknown"):
+        b.reduce(999, 10)
+    with pytest.raises(ValueError, match="positive"):
+        b.reduce(1, 0)
+    with pytest.raises(ValueError, match="delete"):
+        b.reduce(1, 30)                # exactly everything: still a delete
+    assert b.order(1).qty == 30        # refused reduces changed nothing
+
+
 def test_a_refused_replace_leaves_the_original_in_place():
     """A refused amend must not move the original -- including its place
     in line. A(80) then B(30); replacing A to a crossing price raises;

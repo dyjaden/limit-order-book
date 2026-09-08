@@ -139,6 +139,21 @@ class Book:
             raise KeyError(f"unknown order id {order_id}")
         return self._by_id[order_id]
 
+    def orders_at(self, side: Side, price: Price) -> tuple[OrderId, ...]:
+        """The ids resting at one level, queue order, front first. Empty
+        tuple for an absent level. Exists so feed replayers can evict
+        stale liquidity a message has proven dead without reaching into
+        the book's internals."""
+        level = self._levels[side].get(price)
+        if level is None:
+            return ()
+        return tuple(o.order_id for o in level.queue)
+
+    def prices(self, side: Side) -> tuple[Price, ...]:
+        """Every occupied price on a side, best first."""
+        return tuple(sorted(self._levels[side],
+                            reverse=(side is Side.BID)))
+
     def __len__(self) -> int:
         return len(self._by_id)
 
@@ -187,6 +202,28 @@ class Book:
         if not level.queue:
             del self._levels[order.side][order.price]
         del self._by_id[order_id]
+        return order
+
+    def reduce(self, order_id: OrderId, by: Qty) -> Order:
+        """Shrink a resting order in place. Queue position is KEPT, which
+        is the entire reason this operation exists apart from replace:
+        exchanges let an order get smaller without losing its turn, and
+        brokers use that instead of replacing. (LOBSTER type 2 and ITCH
+        partial cancels map here.)
+
+        Reducing to zero or below is refused: a full removal is a delete
+        in feed-land, and conflating the two would let a corrupt reduce
+        masquerade as a legal one."""
+        order = self.order(order_id)
+        if by <= 0:
+            raise ValueError(f"order {order_id}: reduce amount must be "
+                             f"positive, got {by}")
+        if by >= order.qty:
+            raise ValueError(f"order {order_id}: reduce of {by} from "
+                             f"{order.qty} would leave nothing; a full "
+                             f"removal is a delete, not a reduce")
+        order.qty -= by
+        self._levels[order.side][order.price].total_qty -= by
         return order
 
     def replace(self, order_id: OrderId, new_price: Price,
