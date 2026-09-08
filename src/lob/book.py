@@ -32,6 +32,7 @@ twin is Week 8's. Nothing here is clever, so everything here is checkable.
 """
 from __future__ import annotations
 
+import heapq
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
@@ -153,6 +154,15 @@ class Book:
         """Every occupied price on a side, best first."""
         return tuple(sorted(self._levels[side],
                             reverse=(side is Side.BID)))
+
+    def top_levels(self, side: Side, k: int) -> tuple[tuple[Price, Qty], ...]:
+        """(price, total size) for the best k occupied levels, best
+        first. The validator's accessor: called once per message on a
+        deep book, so it takes the k best without sorting everything."""
+        levels = self._levels[side]
+        best = (heapq.nlargest(k, levels) if side is Side.BID
+                else heapq.nsmallest(k, levels))
+        return tuple((p, levels[p].total_qty) for p in best)
 
     def __len__(self) -> int:
         return len(self._by_id)
