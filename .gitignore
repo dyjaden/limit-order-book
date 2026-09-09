@@ -16,3 +16,4 @@ data/
 # trial registry silently never committed) installed as policy from day one.
 results/*
 !results/.gitkeep
+!results/lobster_validation.md

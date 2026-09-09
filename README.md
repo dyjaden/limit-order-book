@@ -13,16 +13,32 @@ measured). This one goes a level down, to how prices actually get made.
 Later on, its Week 7 audits the backtester's own spread assumption
 against measured TAQ data, so the two repos end up checking each other.
 
+## Results (measured, not claimed)
+
+One real day so far: AAPL, 2012-06-21, LOBSTER sample data, replayed
+message by message and graded against LOBSTER's own published book
+states after every single one of 400,390 messages. Zero anomalies,
+zero per-order inconsistencies, 68.4% of rows exact at the touch, and
+**every divergent row machine-classified into one of four named classes
+of the file's own information limit, with zero rows unexplained**. The
+headline finding: a level-filtered feed file is provably not a
+self-contained event log, and we traced a named order through the exact
+mechanism (added in view, deleted below the visible band, resurfacing
+as a phantom). Full write-up, tables, and the falsifiable prediction
+for the raw-ITCH replay: [`results/lobster_validation.md`](results/lobster_validation.md).
+
 ## Status
 
-Week 1 done (2 September 2026): the book core, its invariant suite, and a
-synthetic message tape, all in Python. **17 tests passing**, CI green on
-every push. The suite already earned its keep by catching a real bug
+Week 1 (2 September 2026): the book core, its invariant suite, and a
+synthetic message tape, all in Python. The suite caught a real bug
 before any data existed: a refused amend was silently sending the
 original order to the back of its queue (details in the `Book.replace`
-docstring). Next is Week 2: replay LOBSTER's free sample data and match
-their published book levels row by row. Results will appear above this
-line as they are measured, not before.
+docstring). Week 2 (9 September): LOBSTER replay and the row-by-row
+reference validation above, which added `reduce`, the seed, the
+dark-liquidity rule, ghost eviction, and the witness rule. **31 tests
+passing**, CI green on every push. Next is Week 3: the same day rebuilt
+from raw Nasdaq TotalView-ITCH, where the pre-committed prediction in
+the validation write-up gets its test.
 
 ## Design commitments, stated before the results exist
 
