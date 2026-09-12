@@ -17,3 +17,4 @@ data/
 results/*
 !results/.gitkeep
 !results/lobster_validation.md
+!results/itch_baseline.md

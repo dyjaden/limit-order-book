@@ -153,10 +153,18 @@ class ItchParser:
         return None                       # skipped by length, counted
 
     # ------------------------------------------------------------ stream
-    def parse(self, stream: BinaryIO) -> Iterator[ItchMessage]:
+    def parse(self, stream: BinaryIO,
+              limit: int | None = None) -> Iterator[ItchMessage]:
         """Yield decoded messages from a length-framed stream. Truncated
-        framing is loud: a file that ends mid-message is a wrong file."""
+        framing is loud: a file that ends mid-message is a wrong file.
+
+        `limit` stops after that many messages have been READ from the
+        stream (filtered and unknown ones included), so a benchmark's
+        three stages all see the identical prefix of a multi-gigabyte
+        day. None means the whole stream."""
         while True:
+            if limit is not None and self.messages_read >= limit:
+                return
             head = stream.read(2)
             if not head:
                 return
