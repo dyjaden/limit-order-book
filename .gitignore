@@ -20,3 +20,5 @@ results/*
 !results/itch_baseline.md
 !results/intraday_*_5min.csv
 !results/figures/
+!results/lifecycle_*.csv
+!results/survival_*.csv

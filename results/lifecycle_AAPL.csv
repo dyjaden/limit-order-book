@@ -1,0 +1,84 @@
+section,statistic,value,definition
+ends,orders_added,191015,orders whose ADD (type 1) is in the file
+ends,orders_executed,15968,adds whose last observed shares left by execution
+ends,share_executed,0.083596,orders_executed / orders_added
+ends,orders_cancelled,164962,adds whose last observed shares left by cancel or delete
+ends,share_cancelled,0.863608,orders_cancelled / orders_added
+ends,orders_censored,10085,adds with no observed end: alive at the close OR died below the band (indistinguishable in a level-K file)
+ends,share_censored,0.052797,orders_censored / orders_added
+ends,shares_added,17185977,type-1 shares
+ends,shares_executed,1628740,type-4 shares against visible adds
+ends,shares_cancelled,14845125,type-2 plus type-3 shares against visible adds
+ends,shares_unresolved,712112,added shares with no observed removal (censored remainder)
+lifetime_naive,executed_p10_ms,0.758956,"quantile of observed add-to-executed time, ms; observed deaths only"
+lifetime_naive,executed_p50_ms,1330.878985,"quantile of observed add-to-executed time, ms; observed deaths only"
+lifetime_naive,executed_p90_ms,19369.933942,"quantile of observed add-to-executed time, ms; observed deaths only"
+lifetime_naive,cancelled_p10_ms,1.921587,"quantile of observed add-to-cancelled time, ms; observed deaths only"
+lifetime_naive,cancelled_p50_ms,289.880968,"quantile of observed add-to-cancelled time, ms; observed deaths only"
+lifetime_naive,cancelled_p90_ms,6031.060533,"quantile of observed add-to-cancelled time, ms; observed deaths only"
+lifetime_naive,observed_p50_ms,328.173082,"median observed lifetime, ms, both end kinds; biased short by censoring"
+lifetime_naive,share_under_100ms,0.348803,share of observed lifetimes under 100ms
+lifetime_naive,share_under_1s,0.667479,share of observed lifetimes under 1s
+lifetime_naive,share_over_1min,0.005743,share of observed lifetimes over 1min
+lifetime_km,censored_share,0.052797,orders with no observed end / orders added; each enters the KM estimate as alive at least until its last message
+lifetime_km,median_ms,328.423570,"Kaplan-Meier median lifetime, ms (smallest t with S(t) <= 0.5)"
+lifetime_km,S_at_1ms,0.929898,Kaplan-Meier survival at 1ms: share of orders still resting
+lifetime_naive,S_at_1ms,0.929879,share of OBSERVED lifetimes longer than 1ms
+lifetime_km,S_at_10ms,0.784930,Kaplan-Meier survival at 10ms: share of orders still resting
+lifetime_naive,S_at_10ms,0.784873,share of OBSERVED lifetimes longer than 10ms
+lifetime_km,S_at_100ms,0.651286,Kaplan-Meier survival at 100ms: share of orders still resting
+lifetime_naive,S_at_100ms,0.651197,share of OBSERVED lifetimes longer than 100ms
+lifetime_km,S_at_1s,0.332667,Kaplan-Meier survival at 1s: share of orders still resting
+lifetime_naive,S_at_1s,0.332521,share of OBSERVED lifetimes longer than 1s
+lifetime_km,S_at_10s,0.070501,Kaplan-Meier survival at 10s: share of orders still resting
+lifetime_naive,S_at_10s,0.070403,share of OBSERVED lifetimes longer than 10s
+lifetime_km,S_at_1min,0.005778,Kaplan-Meier survival at 1min: share of orders still resting
+lifetime_naive,S_at_1min,0.005743,share of OBSERVED lifetimes longer than 1min
+lifetime_km,S_at_10min,0.000307,Kaplan-Meier survival at 10min: share of orders still resting
+lifetime_naive,S_at_10min,0.000304,share of OBSERVED lifetimes longer than 10min
+lifetime_km,S_at_1h,0.000039,Kaplan-Meier survival at 1h: share of orders still resting
+lifetime_naive,S_at_1h,0.000039,share of OBSERVED lifetimes longer than 1h
+fill_by_distance,improve_orders,34279,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,improve_share_of_adds,0.179457,bucket orders / orders added
+fill_by_distance,improve_fill_rate_shares,0.246842,"shares executed / shares added, this bucket"
+fill_by_distance,improve_fill_rate_orders,0.221360,"orders with at least one execution / orders, this bucket"
+fill_by_distance,at_best_orders,20538,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,at_best_share_of_adds,0.107520,bucket orders / orders added
+fill_by_distance,at_best_fill_rate_shares,0.225193,"shares executed / shares added, this bucket"
+fill_by_distance,at_best_fill_rate_orders,0.205960,"orders with at least one execution / orders, this bucket"
+fill_by_distance,1_orders,10914,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,1_share_of_adds,0.057137,bucket orders / orders added
+fill_by_distance,1_fill_rate_shares,0.116622,"shares executed / shares added, this bucket"
+fill_by_distance,1_fill_rate_orders,0.105553,"orders with at least one execution / orders, this bucket"
+fill_by_distance,2_to_5_orders,30114,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,2_to_5_share_of_adds,0.157653,bucket orders / orders added
+fill_by_distance,2_to_5_fill_rate_shares,0.065285,"shares executed / shares added, this bucket"
+fill_by_distance,2_to_5_fill_rate_orders,0.064023,"orders with at least one execution / orders, this bucket"
+fill_by_distance,6_to_10_orders,43850,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,6_to_10_share_of_adds,0.229563,bucket orders / orders added
+fill_by_distance,6_to_10_fill_rate_shares,0.022780,"shares executed / shares added, this bucket"
+fill_by_distance,6_to_10_fill_rate_orders,0.021688,"orders with at least one execution / orders, this bucket"
+fill_by_distance,over_10_orders,51319,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,over_10_share_of_adds,0.268665,bucket orders / orders added
+fill_by_distance,over_10_fill_rate_shares,0.027868,"shares executed / shares added, this bucket"
+fill_by_distance,over_10_fill_rate_orders,0.018882,"orders with at least one execution / orders, this bucket"
+fill_by_distance,unknown_orders,1,"adds whose price sat in this bucket relative to the same-side best just before the add (cents; improve < 0, at_best = 0)"
+fill_by_distance,unknown_share_of_adds,0.000005,bucket orders / orders added
+fill_by_distance,unknown_fill_rate_shares,0.000000,"shares executed / shares added, this bucket"
+fill_by_distance,unknown_fill_rate_orders,0.000000,"orders with at least one execution / orders, this bucket"
+sizes,adds_round_lot_share,0.685789,adds with size a multiple of 100
+sizes,adds_odd_lot_share,0.308368,adds with size under 100
+sizes,adds_mixed_lot_share,0.005842,adds over 100 and not a multiple of 100
+sizes,add_size_p50,100,"median add size, shares"
+sizes,add_size_mean,89.971871,"mean add size, shares"
+cancel_to_trade,by_messages_full_day,4.983881,"(type 2 + type 3 messages) / (type 4 + type 5 messages), 9:30 to 16:00"
+cancel_to_trade,by_messages_midas_window,5.037545,"(type 2 + type 3) / (type 4 + type 5), 9:35 to 16:00, the SEC MIDAS window"
+cancel_to_trade,by_orders,10.330787,adds ending cancelled / adds ending executed (censored adds excluded)
+cancel_to_trade,by_shares,9.114484,"shares cancelled / shares executed, visible adds only"
+cancel_to_trade,hidden_share_of_executions,0.323864,type 5 / (type 4 + type 5)
+cancel_to_trade,odd_lot_share_of_executions,0.538725,executions (types 4 and 5) under 100 shares / all executions
+accounting,dark_ops,8381,"operations on ids the file never added (pre-window or below-band), by any type"
+accounting,dark_shares,867236,shares in dark ops
+accounting,hidden_execs,11332,type-5 messages (order id 0)
+accounting,size_disagreements,2,"removals larger than what rested, or deletes naming a different size (the Day 2 counter)"
+accounting,readded_ids,0,ADDs for an id already alive
