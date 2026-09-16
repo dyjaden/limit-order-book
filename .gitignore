@@ -22,3 +22,4 @@ results/*
 !results/figures/
 !results/lifecycle_*.csv
 !results/survival_*.csv
+!results/depth_profile_*.csv

@@ -1,0 +1,67 @@
+side,kind,index,tw_size,tw_gap_cents,share,size_x_ns,ns,two_sided_ns,note
+bid,level,1,169.129218,0.000000,1.000000,3957622986767802,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,2,176.561087,3.545363,1.000000,4131528678716950,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,3,178.629816,6.674203,1.000000,4179936934080170,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,4,171.818186,9.536165,1.000000,4020544827487497,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,5,165.403080,12.259026,1.000000,3870431381481199,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,6,167.254677,14.793010,1.000000,3913758728861562,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,7,164.591370,17.221425,1.000000,3851437361179936,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,8,171.300887,19.551933,1.000000,4008440018217225,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,9,185.164193,21.847230,1.000000,4332841333145715,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,level,10,190.432378,24.132208,1.000000,4456116832873209,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+bid,cent,0,169.129218,0,1.000000,3957622986767802,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,1,62.730525,1,1.000000,1467894017913258,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,2,57.346645,2,1.000000,1341911255493679,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,3,55.672627,3,1.000000,1302739232345099,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,4,49.495886,4,1.000000,1158203517932953,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,5,59.540009,5,1.000000,1393235956322794,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,6,66.578342,6,1.000000,1557932928939679,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,7,69.273686,7,1.000000,1621003951274343,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,8,64.804525,8,1.000000,1516425604174745,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,9,71.396871,9,1.000000,1670686478526831,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,10,88.736858,10,0.998359,2073035239098304,23361603028404,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,11,77.504805,11,0.993309,1801477800834667,23243433842439,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,12,66.775043,12,0.983058,1536063384980191,23003555145086,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,13,67.302066,13,0.968422,1525136741058489,22661068822396,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,14,68.592995,14,0.947979,1521577547749400,22182695950263,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,15,74.207201,15,0.920670,1598695635014517,21543672413558,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,16,63.441812,16,0.889712,1320811565016985,20819259654536,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,17,70.233930,17,0.847902,1393504568596131,19840902742907,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,18,66.175791,18,0.798396,1236327173368128,18682469070360,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,19,68.365717,19,0.743329,1189146373718734,17393898943043,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,cent,20,75.116482,20,0.682994,1200516456424140,15982064460126,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+bid,summary,adjacent_gap_cents,2.681356,,,56469355907018600,210599961829416,23399995758824,"mean cents between consecutive occupied levels, time-weighted"
+bid,summary,one_cent_gap_share,,,0.417330,87889682703592,210599961829416,23399995758824,share of adjacent-level gaps equal to one cent
+ask,level,1,138.373731,0.000000,1.000000,3237944725177181,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,2,118.035319,2.726976,1.000000,2762025965196195,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,3,128.437309,5.203648,1.000000,3005432497095657,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,4,146.723666,7.660016,1.000000,3433333158885616,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,5,145.398272,10.070217,1.000000,3402318952724805,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,6,149.545601,12.457415,1.000000,3499366421665536,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,7,155.391684,14.830713,1.000000,3636164745953534,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,8,147.146939,17.173333,1.000000,3443237745027469,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,9,152.340573,19.500859,1.000000,3564768766763707,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,level,10,160.832311,21.865993,1.000000,3763475401711297,23399995758824,23399995758824,size and gap conditional on the level existing; share = time it existed / two-sided time
+ask,cent,0,138.373731,0,1.000000,3237944725177181,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,1,48.115241,1,1.000000,1125896444644040,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,2,45.954299,2,1.000000,1075330409222559,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,3,47.410033,3,1.000000,1109394581998782,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,4,47.639373,4,1.000000,1114761131535697,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,5,49.113983,5,1.000000,1149266991539860,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,6,59.016410,6,1.000000,1380983732852176,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,7,55.580792,7,1.000000,1300590298575495,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,8,65.238112,8,1.000000,1526571549634643,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,9,66.275500,9,1.000000,1550846420387709,23399995758824,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,10,81.072957,10,0.995850,1889233288061676,23302878761884,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,11,69.540976,11,0.986131,1604689439846801,23075451796444,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,12,69.163314,12,0.969394,1568888553677012,22683825524855,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,13,68.734936,13,0.939871,1511685692628026,21992974587828,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,14,59.876654,14,0.899378,1260130530048471,21045440012294,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,15,58.655965,15,0.851578,1168832516636149,19926916574817,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,16,58.730147,16,0.802407,1102735563060191,18776311911916,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,17,55.705444,17,0.738607,962779153621522,17283394315389,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,18,59.526174,18,0.676414,942185886265405,15828094107117,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,19,58.395153,19,0.614035,839046359160449,14368424705745,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,cent,20,66.853769,20,0.546402,854778656637604,12785795982981,23399995758824,size conditional on the level-10 band reaching this cent; share = coverage
+ask,summary,adjacent_gap_cents,2.429555,,,51166414624838000,210599961829416,23399995758824,"mean cents between consecutive occupied levels, time-weighted"
+ask,summary,one_cent_gap_share,,,0.466791,98306129460615,210599961829416,23399995758824,share of adjacent-level gaps equal to one cent

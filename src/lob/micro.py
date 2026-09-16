@@ -271,3 +271,124 @@ def day_summary(bins: list[BinStats], open_ns: int = OPEN_NS,
 def hms(ns: int) -> str:
     s = ns // NS
     return f"{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}"
+
+
+# --------------------------------------------------------- book shape
+@dataclass
+class LevelProfile:
+    """Time-weighted shape of one side by OCCUPIED level rank j = 1..K.
+
+    LOBSTER's levels are occupied prices, so level j's distance from the
+    touch is a measurement, not j - 1 cents. Sizes are conditional on
+    the level existing (``exists_ns[j]``); ``two_sided_ns`` lets a caller
+    turn them into unconditional means (absent = 0 shares)."""
+    side: str
+    levels: int
+    two_sided_ns: int = 0
+    exists_ns: list[int] = None                 # per rank, time it existed
+    size_x_ns: list[int] = None                 # shares x ns, per rank
+    gap_x_ns: list[int] = None                  # price units from level 1 x ns
+    adjacent_gaps_x_ns: int = 0                 # sum over j >= 2 of gap_j - gap_{j-1}, x ns
+    adjacent_gaps_n_x_ns: int = 0               # number of adjacent gaps x ns
+    one_cent_gaps_x_ns: int = 0                 # adjacent gaps == INCREMENT x ns
+
+    def __post_init__(self):
+        n = self.levels + 1
+        self.exists_ns = [0] * n
+        self.size_x_ns = [0] * n
+        self.gap_x_ns = [0] * n
+
+    def tw_size(self, j: int) -> float | None:
+        return _ratio(self.size_x_ns[j], self.exists_ns[j])
+
+    def tw_gap_cents(self, j: int) -> float | None:
+        return _ratio(self.gap_x_ns[j], INCREMENT * self.exists_ns[j])
+
+    def exists_share(self, j: int) -> float | None:
+        return _ratio(self.exists_ns[j], self.two_sided_ns)
+
+    @property
+    def tw_adjacent_gap_cents(self) -> float | None:
+        """Mean cents between consecutive occupied levels: 1.0 on a dense
+        book, larger on a sparse one."""
+        return _ratio(self.adjacent_gaps_x_ns, INCREMENT * self.adjacent_gaps_n_x_ns)
+
+    @property
+    def one_cent_gap_share(self) -> float | None:
+        """Share of adjacent-level gaps that are exactly one cent."""
+        return _ratio(self.one_cent_gaps_x_ns, self.adjacent_gaps_n_x_ns)
+
+
+@dataclass
+class CentProfile:
+    """Time-weighted shares resting exactly d cents behind the best, for
+    d = 0..max_cents, the regime-comparable picture in which a sparse
+    book shows its holes.
+
+    A level-K file only shows the band from the best to the K-th
+    occupied level. Inside that band an unoccupied cent is a known
+    zero; beyond it the depth is UNKNOWN, not zero. ``covered_ns[d]`` is
+    the time the band reached cent d, so ``tw_size(d)`` is conditional on
+    visibility and ``coverage(d)`` says how much of the day that was."""
+    side: str
+    max_cents: int
+    two_sided_ns: int = 0
+    covered_ns: list[int] = None
+    size_x_ns: list[int] = None
+
+    def __post_init__(self):
+        self.covered_ns = [0] * (self.max_cents + 1)
+        self.size_x_ns = [0] * (self.max_cents + 1)
+
+    def tw_size(self, d: int) -> float | None:
+        return _ratio(self.size_x_ns[d], self.covered_ns[d])
+
+    def coverage(self, d: int) -> float | None:
+        return _ratio(self.covered_ns[d], self.two_sided_ns)
+
+
+def book_shape(states: Iterable[State], levels: int = 10,
+               max_cents: int = 20) -> tuple[dict[str, LevelProfile],
+                                             dict[str, CentProfile]]:
+    """Both profiles for both sides in one pass over two-sided states.
+    Sub-cent prices (none on a Reg NMS book above $1) would land on the
+    cent they round down to."""
+    lv = {"bid": LevelProfile("bid", levels), "ask": LevelProfile("ask", levels)}
+    ct = {"bid": CentProfile("bid", max_cents), "ask": CentProfile("ask", max_cents)}
+    for s in states:
+        ns = s.hold_ns
+        if not ns or not s.asks or not s.bids:
+            continue
+        for side, ladder in (("bid", s.bids), ("ask", s.asks)):
+            L, C = lv[side], ct[side]
+            L.two_sided_ns += ns
+            C.two_sided_ns += ns
+            best = ladder[0][0]
+            prev_gap = 0
+            last_gap_units = 0
+            for j, (price, size) in enumerate(ladder[:levels], start=1):
+                gap = (best - price) if side == "bid" else (price - best)
+                L.exists_ns[j] += ns
+                L.size_x_ns[j] += size * ns
+                L.gap_x_ns[j] += gap * ns
+                if j >= 2:
+                    step = gap - prev_gap
+                    L.adjacent_gaps_x_ns += step * ns
+                    L.adjacent_gaps_n_x_ns += ns
+                    if step == INCREMENT:
+                        L.one_cent_gaps_x_ns += ns
+                prev_gap = gap
+                last_gap_units = gap
+                d = gap // INCREMENT
+                if d <= max_cents:
+                    C.size_x_ns[d] += size * ns
+            # the band covers every cent from 0 to the last level's cent:
+            # record the reach once, and turn it into per-cent coverage
+            # with one suffix sum at the end
+            C.covered_ns[min(max_cents, last_gap_units // INCREMENT)] += ns
+    for C in ct.values():
+        acc = 0
+        for d in range(C.max_cents, -1, -1):          # covered_ns[d] becomes
+            acc += C.covered_ns[d]                    # the time the band
+            C.covered_ns[d] = acc                     # reached cent d or beyond
+    return lv, ct
