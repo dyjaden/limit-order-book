@@ -1,0 +1,127 @@
+{
+ "ticker": "AAPL",
+ "check1": {
+  "ok": true,
+  "level1": {
+   "two_sided_ns": 23399995758824,
+   "spread_x_ns": 35414581458791400,
+   "mid2_x_ns": 273072229769220956800,
+   "one_cent_ns": 31151654168,
+   "touch_x_ns": 7195567711944983,
+   "trades": 23658,
+   "trade_shares": 1845964
+  },
+  "level10": {
+   "two_sided_ns": 23399995758824,
+   "spread_x_ns": 35414581458791400,
+   "mid2_x_ns": 273072229769220956800,
+   "one_cent_ns": 31151654168,
+   "touch_x_ns": 7195567711944983,
+   "trades": 23658,
+   "trade_shares": 1845964
+  },
+  "n1": 118497,
+  "n10": 400391
+ },
+ "check2": {
+  "budget": [
+   {
+    "name": "spread, cents",
+    "reference": 15.134439263920282,
+    "ours": 14.515134257883611,
+    "predicted": "lower or equal",
+    "relative": -0.04092024786891586,
+    "sign_ok": true
+   },
+   {
+    "name": "one-cent share",
+    "reference": 0.001331267513424779,
+    "ours": 0.003524989976459462,
+    "predicted": "none",
+    "relative": 1.647844960470175,
+    "sign_ok": true
+   },
+   {
+    "name": "touch depth, shares",
+    "reference": 307.50294940679964,
+    "ours": 285.8478064524738,
+    "predicted": "higher",
+    "relative": -0.07042255365712931,
+    "sign_ok": false
+   },
+   {
+    "name": "depth-5, shares",
+    "reference": 1538.509685158266,
+    "ours": 1350.0129531488262,
+    "predicted": "higher",
+    "relative": -0.1225190415294975,
+    "sign_ok": false
+   },
+   {
+    "name": "depth-10, shares",
+    "reference": 3182.5102974614765,
+    "ours": 2604.2229638317867,
+    "predicted": "higher",
+    "relative": -0.1817079222307496,
+    "sign_ok": false
+   },
+   {
+    "name": "bid level-10 distance, cents",
+    "reference": 24.132207752954116,
+    "ours": 24.44922250855013,
+    "predicted": "none",
+    "relative": 0.013136583226920288,
+    "sign_ok": true
+   },
+   {
+    "name": "bid adjacent gap, cents",
+    "reference": 2.681356416994902,
+    "ours": 2.7217404940887824,
+    "predicted": "none",
+    "relative": 0.015061062691225719,
+    "sign_ok": true
+   },
+   {
+    "name": "ask level-10 distance, cents",
+    "reference": 21.86599311905578,
+    "ours": 21.838344774757207,
+    "predicted": "none",
+    "relative": -0.0012644449373066845,
+    "sign_ok": true
+   },
+   {
+    "name": "ask adjacent gap, cents",
+    "reference": 2.429554791006198,
+    "ours": 2.4395747016933247,
+    "predicted": "none",
+    "relative": 0.004124175640828863,
+    "sign_ok": true
+   }
+  ],
+  "stats": {
+   "dark_ops": 11351,
+   "evictions": 12014,
+   "evicted_shares": 873292,
+   "anomalies": 0,
+   "delete_size_disagreements": 0
+  },
+  "decomposition": [
+   {
+    "name": "touch depth",
+    "reference": 307.50294940679964,
+    "surplus": 11.343050296411995,
+    "deficit": 33.00163495381402,
+    "net": -21.658584657402024
+   },
+   {
+    "name": "depth-10",
+    "reference": 3182.5102974614765,
+    "surplus": 87.98173140007819,
+    "deficit": 666.3063673359851,
+    "net": -578.3246359359069
+   }
+  ],
+  "signs_ok": false
+ },
+ "check3": null
+}

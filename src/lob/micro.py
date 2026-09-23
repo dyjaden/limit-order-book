@@ -107,6 +107,7 @@ class BinStats:
     trade_shares: int = 0
     hidden: int = 0              # hidden executions (5)
     hidden_shares: int = 0
+    odd_lot_trades: int = 0      # executions (4 and 5) under 100 shares
 
     # ------------------------------------------------------------ ratios
     @property
@@ -214,6 +215,8 @@ def _count(b: BinStats, m) -> None:
     elif k is EventType.EXEC_HIDDEN:
         b.hidden += 1
         b.hidden_shares += m.size
+    if k in (EventType.EXEC, EventType.EXEC_HIDDEN) and m.size < 100:
+        b.odd_lot_trades += 1
 
 
 def time_weighted(messages, reference, width_ns: int = DEFAULT_BIN_NS,

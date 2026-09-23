@@ -42,6 +42,25 @@ ITCH day has not run yet, so the prediction stands on synthetic data
 only. Numbers, the filter's measured cost, and the Python throughput
 baseline: [`results/itch_baseline.md`](results/itch_baseline.md).
 
+Then the book was measured, time-weighted, from LOBSTER's own exact
+top-ten states. AAPL, 2012-06-21, Nasdaq: a quoted spread of 15.1 cents
+(2.6 bps) that falls all day rather than tracing a U, to 0.9 bps in the
+last five minutes; 308 shares at the touch; a book so sparse that
+adjacent occupied levels average 2.5 cents apart and the tenth level is
+22 to 24 cents away. Of 191,015 visible orders, 8% traded and 86% were
+cancelled, with a Kaplan-Meier median lifetime of 328 ms and 5.3%
+censored by the level filter; an order that joined the best got 22.5%
+of its shares filled, one resting five cents behind got 6.5%. Two
+known-answer checks: the level-1 and level-10 files agree on every
+touch statistic **to the integer**, and our replayed book's depth is
+**low by 7% at the touch and 18% over ten levels** against the
+reference, the sign the Day 2 taxonomy predicted wrong, because rows
+are not shares. Write-up, four figures, and the graded list of
+predictions written before the run:
+[`results/microstructure.md`](results/microstructure.md).
+
+![Spread and touch depth through the day, AAPL 2012-06-21](results/figures/intraday_spread_depth.png)
+
 ## Status
 
 Week 1 (2 September 2026): the book core, its invariant suite, and a
@@ -55,10 +74,16 @@ dark-liquidity rule, ghost eviction, and the witness rule. Week 3 (9 to
 binary fiction writer, the full-depth replayer from an empty book, the
 self-filter experiment, and the throughput baseline (parse, replay and
 end to end timed separately, medians with spread, machine named).
-**55 tests passing**, CI green on every push. Next is Week 4:
-descriptive microstructure (spread and depth through the day, queue
-lifetimes, cancel-to-trade ratios), each checked against published
-sample statistics before anything downstream trusts it.
+Week 4 (15 to 23 September): descriptive microstructure, time-weighted
+from the reference states: the intraday spread and depth, order
+lifecycles with censoring handled by Kaplan-Meier, book shape by
+occupied level and by cent, and three known-answer checks (file
+against file, replay against reference, and the SEC's MIDAS numbers
+for the same day, the last pending its download). One name so far;
+MSFT, the large-tick contrast, runs through the same scripts when its
+files land. **83 tests passing**, CI green on every push. Next is
+Week 5: order flow imbalance as Cont, Kukanov and Stoikov define it,
+with the trial registry standing before the first predictability look.
 
 ## Design commitments, stated before the results exist
 
@@ -85,7 +110,7 @@ cd limit-order-book
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python -m pytest -q                  # 55 passed
+python -m pytest -q                  # 83 passed
 python scripts/make_fake_tape.py     # 100k synthetic messages, invariants
                                      # checked at every step
 python scripts/make_fake_itch.py     # the same fiction as ITCH 5.0 bytes,
@@ -94,6 +119,16 @@ python scripts/replay_itch.py        # full-depth replay from an empty book;
                                      # exits nonzero unless every counter is 0
 python scripts/filter_experiment.py  # the self-filter experiment (~10 s)
 python scripts/replay_itch.py --bench --write results/itch_baseline.md
+```
+
+The Week 4 measurements need the LOBSTER files (below) and matplotlib
+(`pip install -e ".[dev,analysis]"`):
+
+```bash
+python scripts/intraday_report.py --ticker AAPL    # then --figure
+python scripts/lifecycle_report.py --ticker AAPL   # then --figure
+python scripts/depth_profile.py --ticker AAPL      # then --figure
+python scripts/microstructure_checks.py --ticker AAPL --write results/microstructure.md
 ```
 
 The two LOBSTER scripts (`scripts/replay_lobster.py --level 10
@@ -120,6 +155,13 @@ not be believed.
   round-trips a synthetic day written by our own writer; the real
   TotalView-ITCH day (a 2 to 6 GB download) is still to run, and until
   it does the Week 2 prediction is confirmed on synthetic data only.
+- **The microstructure numbers are one name until MSFT runs.** Every
+  Week 4 statistic is AAPL on one day, time-weighted from the top ten
+  levels of a level-filtered file; order lifetimes are right-censored
+  by that filter and say so; depth beyond the tenth level is unknown,
+  not zero. Our own replayed book understates depth by 7% at the touch
+  and 18% over ten levels on this file, so on data with no reference
+  its depth is a lower bound.
 - **Throughput is one machine, one Python, whole-run rates.** The
   baseline names its machine and reports medians with spread; it quotes
   no latency percentiles, which wait for Week 9's harness.
