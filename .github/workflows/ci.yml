@@ -1,4 +1,4 @@
-﻿name: ci
+name: ci
 
 # The stranger's path, run on every push: fresh checkout, fresh environment,
 # install, test. The backtester learned on its last day that a green local
@@ -14,5 +14,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -e ".[dev]"
+      - run: python -m pip install -e ".[dev,analysis]"
       - run: python -m pytest -q
