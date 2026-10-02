@@ -154,7 +154,17 @@ The depth error decomposed, in time-weighted shares: surplus is what we hold and
 
 ### Check 3, AAPL: SEC MIDAS, same name, same day, 9:35 to 16:00
 
-MIDAS file not on disk; pending. Download `individual_security_2012_q2.zip` from the SEC's Market Structure Data page into `data/midas/`, unzip, and rerun `python scripts/microstructure_checks.py --ticker AAPL --write results/microstructure.md`.
+MIDAS row from `q2_2012_all.csv`.
+
+| statistic | ours (Nasdaq, level 10) | MIDAS (all venues) | ours / MIDAS | expected | as expected | why |
+|---|---|---|---|---|---|---|
+| cancel-to-trade (cancels / lit trades, 9:35 to 16:00) | 7.4217 | 13.3407 | 0.556 | ours lower | yes | our cancels are level-filtered, executions are not |
+| hidden rate (hidden / all trades) | 0.3212 | 0.2659 | 1.208 | close | yes | same feed family; venue mix explains the rest |
+| odd-lot rate (odd-lot trades / all trades) | 0.5382 | 0.4520 | 1.191 | close | yes | ITCH carries odd lots and MIDAS reads the same feeds |
+| trade-to-order volume (lit volume / add volume) | 0.1067 | 0.0412 | 2.592 | ours higher | yes | OrderVol counts every add at every depth, ours only in-band adds |
+| lit volume, shares | 1,800,497.0000 | 6,539,038.0000 | 0.275 | share | yes | ours / MIDAS is Nasdaq's share: 25 to 35% expected |
+| lit trades | 23,050.0000 | 69,970.0000 | 0.329 | share | yes | Nasdaq's share of the day's visible executions |
+| cancels | 171,070.0000 | 933,448.0000 | 0.183 | share | yes | Nasdaq's share of the day's cancels, minus what the band hides |
 
 <!-- tables:end -->
 

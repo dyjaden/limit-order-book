@@ -123,5 +123,86 @@
   ],
   "signs_ok": false
  },
- "check3": null
+ "check3": {
+  "file": "q2_2012_all.csv",
+  "midas": {
+   "Hidden": 24849.0,
+   "TradesForHidden": 93449.0,
+   "Cancels": 933448.0,
+   "LitTrades": 69970.0,
+   "OddLots": 42856.0,
+   "TradesForOddLots": 94819.0,
+   "LitVol('000)": 6539038.0,
+   "OrderVol('000)": 158826338.0,
+   "HiddenVol('000)": 2224872.0,
+   "TradeVolForHidden('000)": 8529976.0,
+   "OddLotVol('000)": 1555391.0,
+   "TradeVolForOddLots('000)": 8763910.0
+  },
+  "comparisons": [
+   {
+    "statistic": "cancel-to-trade (cancels / lit trades, 9:35 to 16:00)",
+    "ours": 7.421691973969631,
+    "midas": 13.340688866657139,
+    "ratio": 0.5563199957776492,
+    "expected": "ours lower",
+    "as_expected": true,
+    "why": "our cancels are level-filtered, executions are not"
+   },
+   {
+    "statistic": "hidden rate (hidden / all trades)",
+    "ours": 0.32124031920845725,
+    "midas": 0.26590974756284175,
+    "ratio": 1.2080802684096392,
+    "expected": "close",
+    "as_expected": true,
+    "why": "same feed family; venue mix explains the rest"
+   },
+   {
+    "statistic": "odd-lot rate (odd-lot trades / all trades)",
+    "ours": 0.5381783915898584,
+    "midas": 0.4519769244560689,
+    "ratio": 1.1907209471756297,
+    "expected": "close",
+    "as_expected": true,
+    "why": "ITCH carries odd lots and MIDAS reads the same feeds"
+   },
+   {
+    "statistic": "trade-to-order volume (lit volume / add volume)",
+    "ours": 0.10671147232324746,
+    "midas": 0.04117099268510491,
+    "ratio": 2.591909141939494,
+    "expected": "ours higher",
+    "as_expected": true,
+    "why": "OrderVol counts every add at every depth, ours only in-band adds"
+   },
+   {
+    "statistic": "lit volume, shares",
+    "ours": 1800497.0,
+    "midas": 6539038.0,
+    "ratio": 0.2753458536255639,
+    "expected": "share",
+    "as_expected": true,
+    "why": "ours / MIDAS is Nasdaq's share: 25 to 35% expected"
+   },
+   {
+    "statistic": "lit trades",
+    "ours": 23050.0,
+    "midas": 69970.0,
+    "ratio": 0.329426897241675,
+    "expected": "share",
+    "as_expected": true,
+    "why": "Nasdaq's share of the day's visible executions"
+   },
+   {
+    "statistic": "cancels",
+    "ours": 171070.0,
+    "midas": 933448.0,
+    "ratio": 0.18326677008253273,
+    "expected": "share",
+    "as_expected": true,
+    "why": "Nasdaq's share of the day's cancels, minus what the band hides"
+   }
+  ]
+ }
 }

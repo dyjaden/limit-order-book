@@ -27,9 +27,9 @@ import csv
 import json
 from pathlib import Path
 
-from lob.checks import (TOUCH_SUMS, depth_decomposition, error_budget,
-                        levels_agree, midas_comparison, ours_on_midas_window,
-                        read_midas, replayed_rows)
+from lob.checks import (MIDAS_COLUMNS, TOUCH_SUMS, depth_decomposition,
+                        error_budget, levels_agree, midas_comparison,
+                        ours_on_midas_window, read_midas, replayed_rows)
 from lob.lobster import read_messages, read_orderbook
 from lob.micro import (ACCUMULATORS, NS, BinStats, day_summary,
                        time_weighted)
@@ -127,8 +127,10 @@ def run_checks(args) -> dict:
         mine = ours_on_midas_window(bins10)
         comps = midas_comparison(mine, rec)
         print(f"  MIDAS row from {rec['_file']}: " + ", ".join(
-            f"{k}={rec[k]:,.0f}" for k in ("Cancels", "Trades", "OddLots",
-                                          "Hidden", "OrderVol", "TradeVol")
+            f"{k}={rec[k]:,.0f}" for k in ("Cancels", "LitTrades", "OddLots",
+                                          "TradesForOddLots", "Hidden",
+                                          "TradesForHidden", "LitVol('000)",
+                                          "OrderVol('000)")
             if rec.get(k) is not None))
         print(f"    {'statistic':<40} {'ours':>14} {'MIDAS':>14} "
               f"{'ratio':>8}  expected")
@@ -168,9 +170,7 @@ def to_json(report: dict) -> dict:
             "signs_ok": c2["signs_ok"]},
         "check3": None if c3 is None else {
             "file": c3["rec"]["_file"],
-            "midas": {k: c3["rec"].get(k) for k in ("Cancels", "Trades", "OddLots",
-                                                    "Hidden", "TradesForHidden",
-                                                    "OrderVol", "TradeVol")},
+            "midas": {k: c3["rec"].get(k) for k in MIDAS_COLUMNS},
             "comparisons": [{"statistic": c.statistic, "ours": c.ours,
                              "midas": c.midas, "ratio": c.ratio,
                              "expected": c.expected,

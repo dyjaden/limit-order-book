@@ -193,9 +193,21 @@ def depth_decomposition(messages, reference, ours, levels: int = 10,
 
 
 # ------------------------------------------------------------- check 3
-MIDAS_COLUMNS = ("Cancels", "Trades", "LitTrades", "OddLots", "Hidden",
-                 "TradesForHidden", "OrderVol", "TradeVol", "LitVol",
-                 "OddLotVol", "HiddenVol", "TradeVolForHidden")
+# The SEC's per-security file (q2_2012_all.csv inside the quarterly zip)
+# and its README define the metrics as follows. Volumes carry a ('000)
+# suffix and are in thousands of shares; counts are counts.
+#   Cancel-to-Trade        = Cancels / LitTrades
+#   Trade-to-Order-Volume  = LitVol / OrderVol
+#   Hidden Rate            = Hidden / TradesForHidden
+#   Oddlot Rate            = OddLots / TradesForOddLots
+# Each over the exchanges that report the quantity: Nasdaq is in every
+# list, so ours (Nasdaq only) is a subset of each denominator.
+MIDAS_COUNTS = ("Hidden", "TradesForHidden", "Cancels", "LitTrades",
+                "OddLots", "TradesForOddLots")
+MIDAS_THOUSANDS = ("LitVol('000)", "OrderVol('000)", "HiddenVol('000)",
+                   "TradeVolForHidden('000)", "OddLotVol('000)",
+                   "TradeVolForOddLots('000)")
+MIDAS_COLUMNS = MIDAS_COUNTS + MIDAS_THOUSANDS
 
 _DATE_FORMATS = (
     re.compile(r"^(\d{4})(\d{2})(\d{2})$"),                 # 20120621
@@ -229,9 +241,10 @@ def _num(text: str) -> float | None:
 def read_midas(folder: Path, tickers: set[str],
                date: str = "2012-06-21") -> dict[str, dict]:
     """The rows for `tickers` on `date` from every delimited file under
-    `folder` (the SEC zip unpacks to one file per quarter). Header names
-    are matched case-insensitively; the delimiter is sniffed; the date
-    column may be in any of the formats MIDAS has used."""
+    `folder`. Header names are matched case-insensitively for the ticker
+    and date columns; the delimiter is sniffed; the date may be in any
+    of the formats MIDAS has used; the ('000) columns are converted to
+    shares, so every number in the record is a count or a share count."""
     found: dict[str, dict] = {}
     files = sorted(p for p in Path(folder).rglob("*")
                    if p.suffix.lower() in (".csv", ".txt", ".psv", ".tsv"))
@@ -254,9 +267,16 @@ def read_midas(folder: Path, tickers: set[str],
                 ticker = row[it].strip().upper()
                 if ticker not in tickers or norm_date(row[id_]) != date:
                     continue
-                rec = {header[i]: (_num(row[i]) if header[i] in MIDAS_COLUMNS
-                                   else row[i].strip())
-                       for i in range(min(len(header), len(row)))}
+                rec: dict = {}
+                for i in range(min(len(header), len(row))):
+                    h = header[i]
+                    if h in MIDAS_THOUSANDS:
+                        v = _num(row[i])
+                        rec[h] = None if v is None else v * 1000.0
+                    elif h in MIDAS_COUNTS:
+                        rec[h] = _num(row[i])
+                    else:
+                        rec[h] = row[i].strip()
                 rec["_file"] = path.name
                 found[ticker] = rec
     return found
@@ -294,17 +314,18 @@ class Comparison:
 
 def ours_on_midas_window(bins: list[BinStats]) -> dict[str, float | None]:
     """Our counts on MIDAS's 9:35 to 16:00 window, from the intraday
-    bins (five-minute bins put 9:35 on a bin edge)."""
+    bins (five-minute bins put 9:35 on a bin edge), shaped to MIDAS's
+    own definitions: lit means visible (type 4), all means types 4 and 5."""
     w = window(bins, MIDAS_START_NS, CLOSE_NS)
-    trades = w.trades + w.hidden
+    all_trades = w.trades + w.hidden
     return {
-        "cancel_to_trade": w.cancels / trades if trades else None,
-        "hidden_rate": w.hidden / trades if trades else None,
-        "odd_lot_rate": w.odd_lot_trades / trades if trades else None,
-        "trade_to_order_volume": ((w.trade_shares + w.hidden_shares) / w.add_shares
+        "cancel_to_trade": w.cancels / w.trades if w.trades else None,
+        "hidden_rate": w.hidden / all_trades if all_trades else None,
+        "odd_lot_rate": w.odd_lot_trades / all_trades if all_trades else None,
+        "trade_to_order_volume": (w.trade_shares / w.add_shares
                                   if w.add_shares else None),
-        "volume": float(w.trade_shares + w.hidden_shares),
-        "trades": float(trades),
+        "lit_volume": float(w.trade_shares),
+        "lit_trades": float(w.trades),
         "cancels": float(w.cancels),
     }
 
@@ -318,20 +339,23 @@ def midas_comparison(ours: dict, rec: dict) -> list[Comparison]:
         return None if a is None or not b else a / b
 
     return [
-        Comparison("cancel-to-trade (messages, 9:35 to 16:00)",
-                   ours["cancel_to_trade"], ratio(g("Cancels"), g("Trades")),
+        Comparison("cancel-to-trade (cancels / lit trades, 9:35 to 16:00)",
+                   ours["cancel_to_trade"], ratio(g("Cancels"), g("LitTrades")),
                    "ours lower", "our cancels are level-filtered, executions are not"),
-        Comparison("hidden rate", ours["hidden_rate"],
+        Comparison("hidden rate (hidden / all trades)", ours["hidden_rate"],
                    ratio(g("Hidden"), g("TradesForHidden")), "close",
                    "same feed family; venue mix explains the rest"),
-        Comparison("odd-lot rate", ours["odd_lot_rate"],
-                   ratio(g("OddLots"), g("Trades")), "close",
+        Comparison("odd-lot rate (odd-lot trades / all trades)", ours["odd_lot_rate"],
+                   ratio(g("OddLots"), g("TradesForOddLots")), "close",
                    "ITCH carries odd lots and MIDAS reads the same feeds"),
-        Comparison("trade-to-order volume", ours["trade_to_order_volume"],
-                   ratio(g("TradeVol"), g("OrderVol")), "ours higher",
-                   "OrderVol counts every add, ours only in-band adds"),
-        Comparison("daily volume, shares", ours["volume"], g("TradeVol"),
+        Comparison("trade-to-order volume (lit volume / add volume)",
+                   ours["trade_to_order_volume"],
+                   ratio(g("LitVol('000)"), g("OrderVol('000)")), "ours higher",
+                   "OrderVol counts every add at every depth, ours only in-band adds"),
+        Comparison("lit volume, shares", ours["lit_volume"], g("LitVol('000)"),
                    "share", "ours / MIDAS is Nasdaq's share: 25 to 35% expected"),
-        Comparison("trades", ours["trades"], g("Trades"), "share",
-                   "Nasdaq's share of the day's executions"),
+        Comparison("lit trades", ours["lit_trades"], g("LitTrades"), "share",
+                   "Nasdaq's share of the day's visible executions"),
+        Comparison("cancels", ours["cancels"], g("Cancels"), "share",
+                   "Nasdaq's share of the day's cancels, minus what the band hides"),
     ]

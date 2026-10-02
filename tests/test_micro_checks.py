@@ -109,31 +109,41 @@ def test_midas_reader_matches_ticker_and_any_date_format(tmp_path):
     assert norm_date("2012-06-21") == "2012-06-21"
     assert norm_date("6/21/2012") == "2012-06-21"
     assert norm_date("21 June 2012") is None
-    (tmp_path / "individual_security_2012_q2.csv").write_text(
-        "Ticker|Date|Security|Cancels|Trades|LitTrades|OddLots|Hidden|"
-        "TradesForHidden|OrderVol|TradeVol\n"
-        "AAPL|20120620|Stock|1|1|1|1|1|1|1|1\n"
-        "AAPL|20120621|Stock|1,200,000|40,000|38,000|20,000|4,000|39,000|"
-        "50,000,000|12,000,000\n"
-        "MSFT|6/21/2012|Stock|900000|30000|29000|3000|2000|29500|"
-        "80000000|40000000\n"
-        "GOOG|2012-06-21|Stock|1|1|1|1|1|1|1|1\n")
+    header = ("Date,Security,Ticker,McapRank,TurnRank,VolatilityRank,PriceRank,"
+              "LitVol('000),OrderVol('000),Hidden,TradesForHidden,HiddenVol('000),"
+              "TradeVolForHidden('000),Cancels,LitTrades,OddLots,TradesForOddLots,"
+              "OddLotVol('000),TradeVolForOddLots('000)")
+    (tmp_path / "q2_2012_all.csv").write_text(
+        header + "\n"
+        "20120620,Stock,AAPL,10,9,1,10,1,1,1,1,1,1,1,1,1,1,1,1\n"
+        "20120621,Stock,AAPL,10,9,1,10,6539.038,158826.338,24849,93449.0,"
+        "2224.872,8529.976,933448,69970,42856,94819,1555.391,8763.91\n"
+        "6/21/2012,Stock,MSFT,10,6,2,8,28640.606,609751.373,8716,112285.0,"
+        "2204.88,30528.639,1128656,104275,9096,112991,413.398,30757.356\n"
+        "2012-06-21,Stock,GOOG,10,8,1,10,1,1,1,1,1,1,1,1,1,1,1,1\n")
     recs = read_midas(tmp_path, {"AAPL", "MSFT"})
     assert set(recs) == {"AAPL", "MSFT"}
-    assert recs["AAPL"]["Cancels"] == 1_200_000 and recs["AAPL"]["Trades"] == 40_000
-    assert recs["MSFT"]["OrderVol"] == 80_000_000
-    assert recs["AAPL"]["_file"] == "individual_security_2012_q2.csv"
-    ours = {"cancel_to_trade": 5.0, "hidden_rate": 0.32, "odd_lot_rate": 0.5,
-            "trade_to_order_volume": 0.16, "volume": 3_000_000.0,
-            "trades": 35_000.0, "cancels": 175_000.0}
-    comps = {c.statistic: c for c in midas_comparison(ours, recs["AAPL"])}
-    c2t = comps["cancel-to-trade (messages, 9:35 to 16:00)"]
-    assert c2t.midas == 30.0 and c2t.ratio == pytest.approx(5 / 30)
-    assert c2t.as_expected is True                  # ours lower, as predicted
-    vol = comps["daily volume, shares"]
-    assert vol.ratio == pytest.approx(0.25) and vol.as_expected is True
+    a = recs["AAPL"]
+    assert a["Cancels"] == 933_448 and a["LitTrades"] == 69_970
+    assert a["LitVol('000)"] == pytest.approx(6_539_038)       # thousands to shares
+    assert a["OrderVol('000)"] == pytest.approx(158_826_338)
+    assert recs["MSFT"]["TradesForOddLots"] == 112_991
+    assert a["_file"] == "q2_2012_all.csv" and a["Security"] == "Stock"
+    ours = {"cancel_to_trade": 7.0, "hidden_rate": 0.32, "odd_lot_rate": 0.5,
+            "trade_to_order_volume": 0.10, "lit_volume": 1_800_000.0,
+            "lit_trades": 23_000.0, "cancels": 170_000.0}
+    comps = {c.statistic.split(" (")[0]: c for c in midas_comparison(ours, a)}
+    c2t = comps["cancel-to-trade"]
+    assert c2t.midas == pytest.approx(933_448 / 69_970)        # 13.34
+    assert c2t.as_expected is True                              # ours lower
+    assert comps["hidden rate"].midas == pytest.approx(24_849 / 93_449)
+    assert comps["hidden rate"].as_expected is True
+    assert comps["odd-lot rate"].midas == pytest.approx(42_856 / 94_819)
     t2o = comps["trade-to-order volume"]
-    assert t2o.midas == pytest.approx(0.24) and t2o.as_expected is False
+    assert t2o.midas == pytest.approx(6_539_038 / 158_826_338)
+    assert t2o.as_expected is True                              # ours higher
+    vol = comps["lit volume, shares"]
+    assert vol.ratio == pytest.approx(1_800_000 / 6_539_038) and vol.as_expected is True
     assert Comparison("x", None, 1.0, "close", "").as_expected is None
 
 
@@ -144,10 +154,11 @@ def test_ours_on_the_midas_window_drops_the_first_five_minutes():
                     hidden=2, odd_lot_trades=5, trade_shares=800,
                     hidden_shares=200, add_shares=5_000)
     o = ours_on_midas_window([early, late])
-    assert o["cancels"] == 40 and o["trades"] == 10
-    assert o["cancel_to_trade"] == 4.0 and o["hidden_rate"] == 0.2
-    assert o["odd_lot_rate"] == 0.5 and o["volume"] == 1_000
-    assert o["trade_to_order_volume"] == pytest.approx(0.2)
+    assert o["cancels"] == 40 and o["lit_trades"] == 8
+    assert o["cancel_to_trade"] == 5.0                       # cancels / lit trades
+    assert o["hidden_rate"] == 0.2 and o["odd_lot_rate"] == 0.5   # over all trades
+    assert o["lit_volume"] == 800
+    assert o["trade_to_order_volume"] == pytest.approx(800 / 5_000)
 
 
 def test_time_weighted_sums_are_what_check_1_compares():
