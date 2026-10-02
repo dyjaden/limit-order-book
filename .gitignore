@@ -25,3 +25,6 @@ results/*
 !results/depth_profile_*.csv
 !results/microstructure.md
 !results/checks_*.json
+
+# Cowork's delivery folder inside the working copy: vault documents, not repo files
+Claude outputs/
