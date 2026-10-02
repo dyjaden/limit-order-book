@@ -1,11 +1,15 @@
-# What the book looks like: AAPL on 2012-06-21, 23 September 2026
+# What the book looks like: AAPL on 2012-06-21, 2 October 2026
 
 Week 4's measurements: the first time this project looks at a book
-instead of verifying one. One name so far, AAPL from LOBSTER's free
-level-10 sample (Nasdaq, 9:30 to 16:00, 400,391 messages); the second
-name, MSFT, slots into every table and figure below by running the same
-scripts with `--ticker MSFT` once its files are on disk, and the regime
-contrast the week was built around is not made until it does.
+instead of verifying one. One name, AAPL from LOBSTER's level-10 sample
+(Nasdaq, 9:30 to 16:00, 400,391 messages). The second name, MSFT, was
+meant to supply the large-tick contrast; LOBSTER's sample files now sit
+behind an academic request (email, proof, terms, approval) rather than a
+link, so that download is a manual step still open on 2 October. Every
+script and check below takes `--ticker MSFT`, and the tables and figures
+grow a column and a line when its files land; until then the regime
+contrast the week was designed around is unmade, and this file says so
+wherever it matters.
 
 Reproduce (the LOBSTER files are gitignored; `results/lobster_validation.md`
 names them):
@@ -55,11 +59,12 @@ script ran on the data.
    321 shares in the first hour to 345 in the last, then jumps to 582
    in the final five minutes.
 4. Cancel-to-trade by messages between 5 and 50; ours lower than
-   MIDAS's. **Held on the first half**: 4.98 on the day, 5.04 on
-   MIDAS's 9:35 to 16:00 window, at the bottom of the range. The MIDAS
-   half is pending the download (check 3).
+   MIDAS's. **Held**: 4.98 over all executions on the day, 7.42 by
+   MIDAS's own definition (cancels over lit trades, 9:35 to 16:00)
+   against MIDAS's 13.34 for every exchange combined. Ours is lower, as
+   predicted, and by about the amount the level filter hides.
 5. Nasdaq volume over MIDAS all-venue volume roughly 25 to 35%.
-   **Pending** (check 3).
+   **Held**: 27.5% of lit volume, 32.9% of lit trades.
 6. Lifetimes heavy-tailed, a median of seconds for observed deaths, a
    visible mass under 100 ms, a censored fraction of 1 to 10%. **Two of
    three held**: 35% of observed deaths are under 100 ms and 5.3% of
@@ -256,17 +261,35 @@ level-filtered replay's depth should be read as a lower bound by
 roughly a fifth at ten levels, and its spread as right to a few
 percent.
 
-Check 3 is pending the MIDAS download; the table above says exactly
-what to fetch and where to put it. The predicted relations stand as
-written in the guide and in `lob/checks.py`: our cancel-to-trade lower,
-our trade-to-order volume higher, our volume a Nasdaq-sized share of
-the whole, odd-lot and hidden rates close.
+Check 3 puts the SEC's own numbers beside ours. The MIDAS file for
+2012 Q2 carries, for every security and day, the counts and volumes
+behind the SEC's market-structure metrics, over every exchange's
+proprietary feed; its README gives the definitions, and ours were
+reshaped to match them (lit means visible, type 4; hidden is type 5;
+the window is 9:35 to 16:00). Every relation predicted before the
+comparison held. Cancel-to-trade: 7.42 for us against 13.34 for all
+venues, lower as predicted, because our cancels are the ones the
+level-10 band lets through while executions always happen in band
+(our share of the day's cancels is 18%, of its lit trades 33%, and
+that gap is the filter). Hidden rate 32% against 27% and odd-lot rate
+54% against 45%, both close, both a little higher on Nasdaq than on
+the blend. Trade-to-order volume 10.7% against 4.1%, higher as
+predicted, since MIDAS's order volume counts every add at every depth
+on every venue. And Nasdaq's share of AAPL's lit volume that day was
+27.5%, inside the 25 to 35% written down. Nothing in this check could
+fail by a single number, which is why it sits last: it says the day's
+counts are the right order of magnitude and the right way round, not
+that any of them is exact.
 
 ## Limitations
 
 One name, one day, one venue, ten levels. The regime contrast (small
 tick against large tick) is a design of two names and is unmade until
-MSFT runs. Everything about orders is right-censored by the level-10
+MSFT runs; the SEC rows for MSFT are already in `data/midas/`, so the
+moment its LOBSTER files land the whole week reruns in minutes. The
+MIDAS comparison is Nasdaq-only against all-venue totals with
+definitions matched by hand to the SEC's README; it checks magnitudes
+and directions, not values. Everything about orders is right-censored by the level-10
 filter and says so; the fill rates by distance count only orders whose
 add was in view. The depth profile beyond the band is unknown, not
 zero, and is drawn as such. Check 2's error budget is for this file's

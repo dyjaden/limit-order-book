@@ -50,13 +50,16 @@ adjacent occupied levels average 2.5 cents apart and the tenth level is
 22 to 24 cents away. Of 191,015 visible orders, 8% traded and 86% were
 cancelled, with a Kaplan-Meier median lifetime of 328 ms and 5.3%
 censored by the level filter; an order that joined the best got 22.5%
-of its shares filled, one resting five cents behind got 6.5%. Two
+of its shares filled, one resting five cents behind got 6.5%. Three
 known-answer checks: the level-1 and level-10 files agree on every
-touch statistic **to the integer**, and our replayed book's depth is
+touch statistic **to the integer**; our replayed book's depth is
 **low by 7% at the touch and 18% over ten levels** against the
 reference, the sign the Day 2 taxonomy predicted wrong, because rows
-are not shares. Write-up, four figures, and the graded list of
-predictions written before the run:
+are not shares; and against the SEC's MIDAS counts for the same name
+and day, every predicted relation held (our Nasdaq-only cancel-to-trade
+7.4 against 13.3 for all venues, hidden and odd-lot rates within 20%,
+Nasdaq's share of lit volume 27.5%). Write-up, four figures, and the
+graded list of predictions written before the run:
 [`results/microstructure.md`](results/microstructure.md).
 
 ![Spread and touch depth through the day, AAPL 2012-06-21](results/figures/intraday_spread_depth.png)
@@ -79,9 +82,10 @@ from the reference states: the intraday spread and depth, order
 lifecycles with censoring handled by Kaplan-Meier, book shape by
 occupied level and by cent, and three known-answer checks (file
 against file, replay against reference, and the SEC's MIDAS numbers
-for the same day, the last pending its download). One name so far;
-MSFT, the large-tick contrast, runs through the same scripts when its
-files land. **83 tests passing**, CI green on every push. Next is
+for the same day). One name so far; MSFT, the large-tick contrast,
+runs through the same scripts when its LOBSTER files land (LOBSTER's
+samples now sit behind an academic request rather than a link).
+**83 tests passing**, CI green on every push. Next is
 Week 5: order flow imbalance as Cont, Kukanov and Stoikov define it,
 with the trial registry standing before the first predictability look.
 
