@@ -49,9 +49,18 @@ and their durations vary by orders of magnitude across the day. On
 either clock a bucket's price change is its closing mid minus its
 opening mid, and its flow is an integer sum; the two series carry the
 same total flow, because both tile the same events.
+
+The first look. ``ols`` fits a bucket's price change on its flow
+through the origin (the paper's specification) and with an intercept,
+and ``depth_scaling`` repeats the origin fit per window beside the
+window's time-weighted touch depth, then fits log beta on log depth
+across the windows. Both are descriptive: the flow and the price change
+come from the same interval, and the caller logs every fit in the trial
+registry before it prints one (``scripts/ofi_first_look.py``).
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 
@@ -320,3 +329,117 @@ def aggregate_events(events: Iterable[Event], n_per_bucket: int) -> list[Bucket]
             out.append(cur)
             cur = None
     return out
+
+
+# --------------------------------------------------------- the first look
+@dataclass(frozen=True)
+class Fit:
+    """One contemporaneous regression of price change on flow, both
+    ways the question is asked. ``beta0`` is the slope through the
+    origin (the paper's specification, sum xy over sum x squared) and
+    ``beta``/``alpha`` the slope and intercept of the ordinary fit.
+    Both R-squareds are one minus the residual sum over the CENTERED
+    total sum, so they are comparable and the origin fit's can never
+    exceed the intercept fit's. The hit rate is the share of
+    observations where flow and price change have the same sign, over
+    those where both are nonzero; ``excluded`` counts the rest."""
+    n: int
+    beta0: float | None
+    r2_0: float | None
+    beta: float | None
+    alpha: float | None
+    r2: float | None
+    hits: int
+    both_nonzero: int
+    excluded: int
+
+    @property
+    def hit_rate(self) -> float | None:
+        return self.hits / self.both_nonzero if self.both_nonzero else None
+
+
+def ols(xs, ys) -> Fit:
+    """Pure Python, two passes, no library. Slopes are None when the
+    flow never varies; R-squared is None when the price never does."""
+    xs, ys = list(xs), list(ys)
+    n = len(xs)
+    if n != len(ys):
+        raise ValueError("xs and ys differ in length")
+    hits = both = 0
+    for x, y in zip(xs, ys):
+        if x and y:
+            both += 1
+            if (x > 0) == (y > 0):
+                hits += 1
+    if n == 0:
+        return Fit(0, None, None, None, None, None, 0, 0, 0)
+    sx = sum(xs); sy = sum(ys)
+    sxx = sum(x * x for x in xs); sxy = sum(x * y for x, y in zip(xs, ys))
+    my = sy / n
+    sst = sum((y - my) ** 2 for y in ys)
+    beta0 = sxy / sxx if sxx else None
+    r2_0 = None
+    if beta0 is not None and sst:
+        r2_0 = 1 - sum((y - beta0 * x) ** 2 for x, y in zip(xs, ys)) / sst
+    mx = sx / n
+    sxx_c = sxx - n * mx * mx
+    beta = alpha = r2 = None
+    if sxx_c > 0:
+        beta = (sxy - n * mx * my) / sxx_c
+        alpha = my - beta * mx
+        if sst:
+            r2 = 1 - sum((y - alpha - beta * x) ** 2 for x, y in zip(xs, ys)) / sst
+    return Fit(n, beta0, r2_0, beta, alpha, r2, hits, both, n - both)
+
+
+@dataclass(frozen=True)
+class DepthRow:
+    """One window of the depth scaling: the origin slope and its
+    R-squared over the window's buckets, beside the window's mean touch
+    depth per side (time-weighted, from ``lob.micro.time_weighted``)."""
+    index: int
+    start_ns: int
+    end_ns: int
+    n: int
+    beta0: float | None
+    r2_0: float | None
+    depth: float | None
+
+
+@dataclass(frozen=True)
+class Scaling:
+    """log beta0 against log depth across the windows: ``slope`` is the
+    elasticity the paper puts near minus one. Windows without a positive
+    slope or a depth are left out and counted."""
+    rows: tuple
+    n_used: int
+    n_skipped: int
+    slope: float | None
+    intercept: float | None
+    r2: float | None
+
+
+def depth_scaling(buckets: Iterable[Bucket], depth_by_window,
+                  window_ns: int = 1800 * 10**9,
+                  open_ns: int = OPEN_NS) -> Scaling:
+    """Per window of ``window_ns`` from ``open_ns``: the regression of
+    each bucket's price change (cents) on its flow (shares) through the
+    origin, over the buckets starting inside the window, beside the
+    window's depth from ``depth_by_window[index]``; then the log-log
+    slope across windows."""
+    groups: dict[int, list[Bucket]] = {}
+    for b in buckets:
+        groups.setdefault((b.start_ns - open_ns) // window_ns, []).append(b)
+    rows = []
+    for i in range(len(depth_by_window)):
+        bs = groups.get(i, [])
+        fit = ols([b.ofi for b in bs], [b.dmid_cents for b in bs])
+        rows.append(DepthRow(i, open_ns + i * window_ns, open_ns + (i + 1) * window_ns,
+                             fit.n, fit.beta0, fit.r2_0, depth_by_window[i]))
+    pts = [(math.log(r.depth), math.log(r.beta0)) for r in rows
+           if r.beta0 is not None and r.beta0 > 0 and r.depth]
+    skipped = len(rows) - len(pts)
+    if len(pts) < 3:
+        return Scaling(tuple(rows), len(pts), skipped, None, None, None)
+    fit = ols([p[0] for p in pts], [p[1] for p in pts])
+    return Scaling(tuple(rows), len(pts), skipped, fit.beta, fit.alpha, fit.r2)

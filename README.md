@@ -64,6 +64,29 @@ graded list of predictions written before the run:
 
 ![Spread and touch depth through the day, AAPL 2012-06-21](results/figures/intraday_spread_depth.png)
 
+Then the signal the project was pointed at: order flow imbalance, as
+Cont, Kukanov and Stoikov define it, computed from the touch after
+every one of the 400,390 messages, with the sign convention pinned by
+sixteen hand-computed tests and the level-1 and level-10 files giving
+the same 107,164 nonzero events to the share. Aggregated on two clocks
+(ten-second bins hold 0 to 725 best-quote updates; fifty-update
+buckets last from 6 ms to 65 s), and then the first look, which is
+**contemporaneous and descriptive**: the mid change over a ten-second
+bin regressed on the imbalance inside the same bin gives a slope of
+4.1 cents per 1,000 shares, an R-squared of 0.41 and a sign hit rate
+of 86%, with beta stable across five clocks (3.8 to 4.4) and the
+R-squared rising with the interval (0.31 at one second, 0.55 at one
+minute); across thirteen half hours the slope scales with depth to the
+power -1.43, the paper's inverse-depth law with a short lever. Every
+one of those nineteen regressions was a row in `results/trials.csv`
+before it was a number on a page, and none of them is evidence of
+predictability: the flow and the price move happened together. The
+predictive question is Week 6's and is defined in the registry before
+it runs. Write-up with the expectations graded:
+[`results/ofi_first_look.md`](results/ofi_first_look.md).
+
+![Price change against order flow imbalance inside the same interval, AAPL 2012-06-21](results/figures/ofi_first_look.png)
+
 ## Status
 
 Week 1 (2 September 2026): the book core, its invariant suite, and a
@@ -85,9 +108,14 @@ against file, replay against reference, and the SEC's MIDAS numbers
 for the same day). One name so far; MSFT, the large-tick contrast,
 runs through the same scripts when its LOBSTER files land (LOBSTER's
 samples now sit behind an academic request rather than a link).
-**83 tests passing**, CI green on every push. Next is
-Week 5: order flow imbalance as Cont, Kukanov and Stoikov define it,
-with the trial registry standing before the first predictability look.
+Week 5 (2 to 3 October): order flow imbalance from the touch, the two
+clocks, the trial registry (append-only, a number logged before it is
+printed), and the contemporaneous first look, graded against the
+expectations written before the run and reported as descriptive.
+**118 tests passing**, CI green on every push. Next is Week 6, the
+thesis week: the predictive question (next-interval mid change at six
+horizons, a time split, a baseline, the cost against half the spread),
+defined in the registry first and then run.
 
 ## Design commitments, stated before the results exist
 
@@ -114,7 +142,7 @@ cd limit-order-book
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python -m pytest -q                  # 83 passed
+python -m pytest -q                  # 118 passed
 python scripts/make_fake_tape.py     # 100k synthetic messages, invariants
                                      # checked at every step
 python scripts/make_fake_itch.py     # the same fiction as ITCH 5.0 bytes,
@@ -134,6 +162,20 @@ python scripts/lifecycle_report.py --ticker AAPL   # then --figure
 python scripts/depth_profile.py --ticker AAPL      # then --figure
 python scripts/microstructure_checks.py --ticker AAPL --write results/microstructure.md
 ```
+
+Week 5, on the same files:
+
+```bash
+python scripts/ofi_report.py --ticker AAPL                 # events; --level 1 for the identity
+python scripts/ofi_report.py --ticker AAPL --clock calendar --bucket 10
+python scripts/ofi_report.py --ticker AAPL --clock event --bucket 50
+python scripts/ofi_report.py --ticker AAPL --figure        # the two-clock figure
+python scripts/ofi_first_look.py --ticker AAPL --figure    # appends 19 rows to results/trials.csv
+```
+
+The first look logs every regression to the registry before it prints
+it, so each run appends; `python -m lob.registry` says how long the
+file is.
 
 The two LOBSTER scripts (`scripts/replay_lobster.py --level 10
 --validate`) need the free AAPL 2012-06-21 sample files in
@@ -166,6 +208,18 @@ not be believed.
   not zero. Our own replayed book understates depth by 7% at the touch
   and 18% over ten levels on this file, so on data with no reference
   its depth is a lower bound.
+- **The OFI first look is contemporaneous, and is not predictability.**
+  Its slopes, R-squareds and hit rates pair the flow over an interval
+  with the price change inside that same interval, the largest part of
+  which the flow itself produced. Nothing in `results/ofi_first_look.md`
+  or above may be read as a forecast; the predictive question is Week
+  6's. The depth elasticity (-1.43) is estimated across a 1.6-fold
+  range of depth on one day and its R-squared of 0.27 says how much to
+  trust it.
+- **The per-event OFI series is regenerated, not shipped.** At one row
+  per message it is a transformed copy of licensed data;
+  `scripts/ofi_report.py` rebuilds it in seconds from the LOBSTER files.
+  The bucket series and the trial registry are committed.
 - **Throughput is one machine, one Python, whole-run rates.** The
   baseline names its machine and reports medians with spread; it quotes
   no latency percentiles, which wait for Week 9's harness.
