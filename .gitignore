@@ -25,6 +25,10 @@ results/*
 !results/depth_profile_*.csv
 !results/microstructure.md
 !results/checks_*.json
+# the OFI bucket series ship (aggregates); the per-event file, one row per
+# message of the licensed data, is deliberately not listed here
+!results/ofi_*_calendar_*.csv
+!results/ofi_*_event_*.csv
 
 # Cowork's delivery folder inside the working copy: vault documents, not repo files
 Claude outputs/

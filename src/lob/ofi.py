@@ -37,13 +37,25 @@ empty row is not an observation of the best quotes at all: there is no
 best quote on the empty side, an OFI across it is undefined, and the row
 is skipped and counted, so the next event spans from the last two-sided
 observation to the next. Nothing is invented for the missing side.
+
+Two clocks. The events are aggregated two ways and the difference is
+the point. Calendar time (fixed bins from 09:30) is the clock a trading
+question is asked in and the one the paper used; a bin at the open
+holds hundreds of updates and a bin at noon may hold none, and the empty
+bin is still an observation (zero flow, zero price change), never a
+missing one. Event time (a bucket every N best-quote updates) is the
+clock the book runs on: every bucket holds the same number of updates
+and their durations vary by orders of magnitude across the day. On
+either clock a bucket's price change is its closing mid minus its
+opening mid, and its flow is an integer sum; the two series carry the
+same total flow, because both tile the same events.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 
-from lob.micro import INCREMENT
+from lob.micro import CLOSE_NS, INCREMENT, OPEN_NS
 
 BPS = 10_000                     # basis points in one unit of relative change
 
@@ -72,10 +84,10 @@ class Touch:
 
 @dataclass(frozen=True)
 class Event:
-    """e_n between two consecutive two-sided observations, with the
-    twice-mid before and after, so every row of the events file stands
-    on its own and a bucket's price change can be checked against the
-    sum of its events' changes."""
+    """e_n between two consecutive two-sided observations: the time and
+    twice-mid of both, so every row of the events file is a complete
+    transition on its own, and the flow in shares between them."""
+    time_prev_ns: int       # the earlier observation's time
     time_ns: int            # the later observation's time
     e: int                  # shares, signed
     mid2_prev: int
@@ -122,9 +134,9 @@ def events(touches: Iterable[Touch],
            skipped: list[Touch] | None = None) -> Iterator[Event]:
     """One Event per consecutive pair of two-sided observations. A
     one-sided or empty touch is appended to ``skipped`` (when a list is
-    given) and used as neither end of an event, so the chain of mid2
-    values telescopes: every event's ``mid2_prev`` is the previous
-    event's ``mid2``."""
+    given) and used as neither end of an event, so the chain telescopes:
+    every event's ``time_prev_ns`` and ``mid2_prev`` are the previous
+    event's ``time_ns`` and ``mid2``."""
     prev: Touch | None = None
     for t in touches:
         if not t.two_sided:
@@ -132,7 +144,8 @@ def events(touches: Iterable[Touch],
                 skipped.append(t)
             continue
         if prev is not None:
-            yield Event(t.time_ns, ofi_event(prev, t), prev.mid2, t.mid2)
+            yield Event(prev.time_ns, t.time_ns, ofi_event(prev, t),
+                        prev.mid2, t.mid2)
         prev = t
 
 
@@ -185,3 +198,125 @@ def day_summary(events: Iterable[Event], skipped: int = 0) -> dict:
                            BPS * (last_mid2 - first_mid2) / first_mid2),
         "skipped": skipped,
     }
+
+
+# ------------------------------------------------------------ two clocks
+@dataclass
+class Bucket:
+    """OFI over one interval of either clock, as integer sums plus the
+    twice-mid at both ends.
+
+    Calendar clock: ``start_ns`` and ``end_ns`` are the bin's edges, and
+    a bin with no observation inside still exists, with zero flow and
+    ``mid2_open == mid2_close`` (the mid did not move), so the series is
+    complete and a regression's n is honest. Event clock: a bucket is
+    every ``n`` best-quote updates, and it runs from the observation
+    whose mid is its open (the previous bucket's last update, or the
+    day's first observation) to its own last update, so consecutive
+    buckets tile the day with no gaps. On either clock the price change
+    is the close minus the open, never a sum of per-event changes."""
+    index: int
+    start_ns: int
+    end_ns: int
+    n_events: int = 0            # observations inside, zero events included
+    n_updates: int = 0           # best-quote updates inside: nonzero e_n
+    ofi: int = 0                 # sum of e_n, shares
+    abs_flow: int = 0            # sum of |e_n|, shares
+    mid2_open: int | None = None
+    mid2_close: int | None = None
+
+    @property
+    def duration_ns(self) -> int:
+        return self.end_ns - self.start_ns
+
+    @property
+    def dmid_cents(self) -> float | None:
+        if self.mid2_open is None or self.mid2_close is None:
+            return None
+        return (self.mid2_close - self.mid2_open) / (2 * INCREMENT)
+
+    @property
+    def dmid_bps(self) -> float | None:
+        """Relative mid change in basis points: 1e4 * (mid_close -
+        mid_open) / mid_open, which is the same ratio of the twice-mids."""
+        if not self.mid2_open or self.mid2_close is None:
+            return None
+        return BPS * (self.mid2_close - self.mid2_open) / self.mid2_open
+
+    def _take(self, ev: Event) -> None:
+        self.n_events += 1
+        if ev.e:
+            self.n_updates += 1
+        self.ofi += ev.e
+        self.abs_flow += abs(ev.e)
+
+
+BUCKET_COLUMNS = ("n_events", "n_updates", "ofi", "abs_flow",
+                  "mid2_open", "mid2_close")
+
+
+def _in_order(events: Iterable[Event]) -> Iterator[Event]:
+    """Events must arrive in time order, like the rows they came from;
+    a stream that runs backwards is a wrong stream, not a quirk."""
+    last = None
+    for ev in events:
+        if last is not None and ev.time_ns < last:
+            raise ValueError(f"events out of order: {ev.time_ns} after {last}")
+        last = ev.time_ns
+        yield ev
+
+
+def aggregate_calendar(events: Iterable[Event], width_ns: int,
+                       open_ns: int = OPEN_NS,
+                       close_ns: int = CLOSE_NS) -> list[Bucket]:
+    """Fixed bins of ``width_ns`` from ``open_ns``; the last bin ends at
+    ``close_ns``. Each bin's open is the mid prevailing at its start,
+    which is the last observation before it (the day's first observation
+    for the bins before any event, so the mid is taken to hold from the
+    open until it is first seen); its close is the last observation
+    inside it, or the open again when there is none. Events outside
+    [open, close) move the running mid but are not counted, so a caller
+    can see how many fell outside by comparing counts."""
+    if width_ns <= 0:
+        raise ValueError("width_ns must be positive")
+    n_bins = -(-(close_ns - open_ns) // width_ns)                 # ceiling
+    bins = [Bucket(i, open_ns + i * width_ns,
+                   min(open_ns + (i + 1) * width_ns, close_ns))
+            for i in range(n_bins)]
+    stream = _in_order(events)
+    ev = next(stream, None)
+    mid2 = ev.mid2_prev if ev is not None else None
+    while ev is not None and ev.time_ns < open_ns:
+        mid2 = ev.mid2
+        ev = next(stream, None)
+    for b in bins:
+        b.mid2_open = mid2
+        while ev is not None and ev.time_ns < b.end_ns:
+            b._take(ev)
+            mid2 = ev.mid2
+            ev = next(stream, None)
+        b.mid2_close = mid2
+    return bins
+
+
+def aggregate_events(events: Iterable[Event], n_per_bucket: int) -> list[Bucket]:
+    """A bucket every ``n_per_bucket`` best-quote updates (nonzero e_n),
+    in order. Zero events (hidden executions, messages below the touch)
+    are counted in whichever bucket is open when they arrive and move
+    nothing. The trailing partial bucket is dropped; the caller sees how
+    much by comparing counts, and says so."""
+    if n_per_bucket <= 0:
+        raise ValueError("n_per_bucket must be positive")
+    out: list[Bucket] = []
+    cur: Bucket | None = None
+    for ev in _in_order(events):
+        if cur is None:
+            cur = Bucket(len(out), ev.time_prev_ns, ev.time_ns,
+                         mid2_open=ev.mid2_prev)
+        cur._take(ev)
+        cur.end_ns = ev.time_ns
+        cur.mid2_close = ev.mid2
+        if cur.n_updates == n_per_bucket:
+            out.append(cur)
+            cur = None
+    return out

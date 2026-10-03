@@ -110,6 +110,7 @@ def test_a_one_sided_observation_is_skipped_and_counted_never_invented():
     # rose so the whole old ask queue counts (+150)
     assert evs[0].e == +170
     assert evs[0].mid2_prev == a.mid2 and evs[0].mid2 == c.mid2
+    assert evs[0].time_prev_ns == a.time_ns          # the skipped row is not an end
     with pytest.raises(ValueError):
         ofi_event(a, b)
     with pytest.raises(ValueError):
@@ -135,18 +136,20 @@ def test_the_mid_chain_telescopes_and_reads_in_cents():
     ts = [T(10_000, 300, 10_100, 150, 0), T(10_050, 250, 10_100, 150, 1),
           T(10_050, 250, 10_150, 10, 2)]
     evs = list(events(ts))
+    assert [ev.time_prev_ns for ev in evs] == [ts[0].time_ns, ts[1].time_ns]
+    assert [ev.time_ns for ev in evs] == [ts[1].time_ns, ts[2].time_ns]
     assert [ev.mid2_prev for ev in evs] == [20_100, 20_150]
     assert [ev.mid2 for ev in evs] == [20_150, 20_200]
     assert [ev.e for ev in evs] == [+250, +150]
     assert evs[0].dmid_cents == 0.25                 # 50 units of mid2 = 25 units of mid
     assert evs[1].dmid_cents == 0.25
-    assert Event(0, 0, 20_000, 19_000).dmid_cents == -5.0
+    assert Event(0, 1, 0, 20_000, 19_000).dmid_cents == -5.0
 
 
 def test_day_summary_counts_and_sums_by_hand():
-    evs = [Event(1, +100, 20_000, 20_000), Event(2, 0, 20_000, 20_000),
-           Event(3, -40, 20_000, 19_900), Event(4, +25, 19_900, 20_000),
-           Event(5, 0, 20_000, 20_050)]
+    evs = [Event(0, 1, +100, 20_000, 20_000), Event(1, 2, 0, 20_000, 20_000),
+           Event(2, 3, -40, 20_000, 19_900), Event(3, 4, +25, 19_900, 20_000),
+           Event(4, 5, 0, 20_000, 20_050)]
     s = day_summary(evs, skipped=3)
     assert s["events"] == 5 and s["zero_events"] == 2 and s["zero_share"] == 0.4
     assert s["positive"] == 2 and s["negative"] == 1
