@@ -29,6 +29,8 @@ results/*
 # message of the licensed data, is deliberately not listed here
 !results/ofi_*_calendar_*.csv
 !results/ofi_*_event_*.csv
+!results/trials.csv
+!results/ofi_first_look.md
 
 # Cowork's delivery folder inside the working copy: vault documents, not repo files
 Claude outputs/
