@@ -31,6 +31,10 @@ results/*
 !results/ofi_*_event_*.csv
 !results/trials.csv
 !results/ofi_first_look.md
+!results/ofi_decay_*.csv
+!results/ofi_regimes_*.csv
+!results/ofi_cost_*.csv
+!results/ofi_prediction.md
 
 # Cowork's delivery folder inside the working copy: vault documents, not repo files
 Claude outputs/
