@@ -206,3 +206,57 @@ def evaluate(fit: Iterable[Pair], test: Iterable[Pair], predictor: str) -> Forec
     edge = edge_sum / n_signals if n_signals else None
     return Forecast(predictor, len(fit), len(test), beta, t, r2, hits, both,
                     len(test) - both, edge, n_signals)
+
+
+# ------------------------------------------------------------- regimes
+WINDOWS_S = (("open", 34_200, 36_000),        # 09:30 to 10:00
+             ("midday", 39_600, 50_400),      # 11:00 to 14:00
+             ("close", 55_800, 57_600))       # 15:30 to 16:00
+DECILE = 0.1
+
+
+@dataclass(frozen=True)
+class Regime:
+    """A set of forecast opportunities defined by what was known at the
+    forecast: a window of the day the forecast bucket lies inside, or a
+    decile of trailing realized variance."""
+    name: str
+    kind: str                      # 'window' | 'decile'
+    label: str
+    member: Callable[[Pair], bool]
+
+
+def _nearest_rank(xs, q: float) -> float:
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(q * (len(xs) - 1) + 0.5))]
+
+
+def regimes(pairs: Iterable[Pair], split_ns: int = SPLIT_NS,
+            windows=WINDOWS_S, decile: float = DECILE) -> list[Regime]:
+    """The three windows by forecast bucket (wholly inside the window)
+    and the two variance deciles, whose thresholds come from the pairs
+    of the first half only, so no test-half information sets a cut."""
+    out = []
+    for name, start_s, end_s in windows:
+        start_ns, end_ns = start_s * 10**9, end_s * 10**9
+
+        def inside(p: Pair, s=start_ns, e=end_ns) -> bool:
+            width = p.target_end_ns - p.time_ns
+            return p.time_ns - width >= s and p.time_ns <= e
+        out.append(Regime(name, "window", f"{start_s // 3600:02d}:{start_s % 3600 // 60:02d}-"
+                                          f"{end_s // 3600:02d}:{end_s % 3600 // 60:02d}", inside))
+    first = [p.var for p in pairs if p.var is not None and p.target_end_ns <= split_ns]
+    if first:
+        hi, lo = _nearest_rank(first, 1 - decile), _nearest_rank(first, decile)
+        out.append(Regime("high-vol", "decile", f"trailing variance >= {hi:.4g} (top decile, first-half cut)",
+                          lambda p, hi=hi: p.var is not None and p.var >= hi))
+        out.append(Regime("quiet", "decile", f"trailing variance <= {lo:.4g} (bottom decile, first-half cut)",
+                          lambda p, lo=lo: p.var is not None and p.var <= lo))
+    return out
+
+
+def leave_out(pairs: Iterable[Pair], regime: Regime) -> tuple[list[Pair], list[Pair]]:
+    """Fit on everything outside the regime, test inside it."""
+    pairs = list(pairs)
+    return ([p for p in pairs if not regime.member(p)],
+            [p for p in pairs if regime.member(p)])

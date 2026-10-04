@@ -168,3 +168,91 @@ def test_every_decay_fit_is_logged_before_anything_prints(tmp_path, monkeypatch,
     csv_rows = op.read_csv(tmp_path / "ofi_decay_FAKE.csv")
     assert len(csv_rows) == expected and csv_rows[0]["predictor"] == "ofi"
 
+
+
+# ------------------------------------------------------------- regimes
+def test_regimes_leave_the_window_out_and_the_split_exposes_a_local_signal():
+    """Ten-second buckets through the open and beyond: the flow predicts
+    the next move inside 09:30 to 10:00 (y = x) and anti-predicts it
+    everywhere else (y = -x). The complement fit carries the wrong
+    sign, so inside the window the out-of-sample hit rate is zero, which
+    is exactly what a leave-the-window-out split must show."""
+    from lob.predict import leave_out, regimes
+    buckets = []
+    for i in range(0, 1_200):                              # 09:30 to 12:50
+        start_s = 10 * i
+        x = 100 if i % 2 else -100
+        inside_open = start_s + 10 <= 1_800                 # bucket wholly before 10:00
+        # the NEXT bucket's move is set by this bucket's flow and regime
+        buckets.append((start_s, x, inside_open))
+    series = []
+    for i, (start_s, x, inside_open) in enumerate(buckets):
+        # bucket i's own mid change is decided by bucket i - 1's rule
+        if i == 0:
+            d = 0.0
+        else:
+            px, pin = buckets[i - 1][1], buckets[i - 1][2]
+            d = (px if pin else -px) / 100
+        series.append(B(i, start_s, 10, x, d))
+    ps = pairs(series)
+    rgs = {r.name: r for r in regimes(ps, split_ns=OPEN_NS + 6_000 * NS)}
+    assert set(rgs) == {"open", "midday", "close", "high-vol", "quiet"}
+    assert rgs["open"].label == "09:30-10:00" and rgs["close"].label == "15:30-16:00"
+    fit, test = leave_out(ps, rgs["open"])
+    assert len(test) == 180                                 # buckets 0..179 lie wholly inside the open
+    assert all(p.time_ns <= OPEN_NS + 1_800 * NS for p in test)
+    assert all(p.time_ns - (p.target_end_ns - p.time_ns) >= OPEN_NS for p in test)
+    f = evaluate(fit, test, "ofi")
+    assert f.beta == pytest.approx(-0.01)                   # the complement's sign
+    assert f.hit_rate == 0.0 and f.both_nonzero == 180
+    inside_only = evaluate(test, test, "ofi")              # not a split: the wrong thing to do
+    assert inside_only.hit_rate == 1.0
+    # the midday window's forecasts lie wholly inside 11:00 to 14:00
+    _, mid = leave_out(ps, rgs["midday"])
+    assert mid and all(OPEN_NS + 5_400 * NS <= p.time_ns - 10 * NS and
+                       p.time_ns <= OPEN_NS + 16_200 * NS for p in mid)
+    assert not leave_out(ps, rgs["close"])[1]              # the series ends at 12:50
+
+
+def test_variance_deciles_take_their_cut_from_the_first_half_only():
+    from lob.predict import leave_out, regimes
+    # first half: calm (moves of 1 cent); second half: wild (moves of 10 cents)
+    series = []
+    for i in range(400):
+        d = 1.0 if i < 200 else 10.0
+        series.append(B(i, 10 * i, 10, 100, d if i % 2 else -d))
+    ps = pairs(series)
+    split_ns = OPEN_NS + 2_000 * NS
+    rgs = {r.name: r for r in regimes(ps, split_ns=split_ns)}
+    hi_members = leave_out(ps, rgs["high-vol"])[1]
+    # the cut is the first half's 90th percentile (6 cents squared), so
+    # every second-half pair with a full window qualifies as high-vol
+    assert all(p.var >= 6.0 for p in hi_members)
+    assert sum(1 for p in hi_members if p.time_ns >= split_ns) > 150
+    assert "first-half cut" in rgs["high-vol"].label
+    quiet = leave_out(ps, rgs["quiet"])[1]
+    assert quiet and all(p.var <= 6.0 for p in quiet)
+    assert all(p.time_ns < split_ns + 60 * NS for p in quiet)
+
+
+def test_every_regime_fit_is_logged_before_anything_prints(tmp_path, monkeypatch, capsys):
+    msgs, ref = _fake_day(tmp_path)
+    evs = list(events(touches(msgs, ref)))
+    day = op.Day("FAKE", 10, msgs, ref, evs)
+    registry = tmp_path / "trials.csv"
+    seen = {}
+    real_print = op.print_regimes
+
+    def spy_print(rows, ticker):
+        seen["at_print"] = count(registry)
+        return real_print(rows, ticker)
+    monkeypatch.setattr(op, "print_regimes", spy_print)
+    monkeypatch.setattr(op, "KEY_S", 0.5)
+    monkeypatch.setattr(op, "SPLIT_NS", OPEN_NS + 4 * NS)
+    rows = op.part_regimes(None, day, registry, tmp_path)
+    expected = 5 * 2
+    assert seen["at_print"] == expected and len(rows) == expected
+    assert {r["split"] for r in read(registry)} == {"all-but-window/window",
+                                                     "all-but-decile/decile"}
+    assert {r["verdict"] for r in rows} <= {"above", "inside", "below", "no call"}
+    assert "REGIMES" in capsys.readouterr().out

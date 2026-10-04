@@ -43,7 +43,7 @@ from lob.lobster import read_messages, read_orderbook
 from lob.micro import NS, hms, time_weighted
 from lob.ofi import aggregate_calendar, events, touches
 from lob.predict import (HORIZONS_S, KEY_S, PREDICTORS, SPLIT_NS, Forecast,
-                         Pair, evaluate, pairs, split)
+                         Pair, evaluate, leave_out, pairs, regimes, split)
 from lob.registry import REGISTRY, log_trial
 
 SCRIPT = "ofi_prediction.py"
@@ -208,6 +208,82 @@ def part_decay(args, day: Day, registry: Path, out: Path) -> list[dict]:
     return rows
 
 
+# ------------------------------------------------------------ regimes
+REGIME_COLUMNS = ("regime", "kind", "label", "horizon_s", "predictor", "n_fit", "n_test",
+                  "beta", "t_stat", "r2_oos", "hits", "both_nonzero", "excluded",
+                  "hit_rate", "z", "band", "verdict", "edge_cents", "n_signals",
+                  "trial_id")
+
+
+def verdict_word(f: Forecast) -> str:
+    """Where the regime's hit rate sits against the band a coin would
+    produce with this many calls: above it, inside it, or below it."""
+    if f.hit_rate is None:
+        return "no call"
+    if f.hit_rate - 0.5 > f.band:
+        return "above"
+    if 0.5 - f.hit_rate > f.band:
+        return "below"
+    return "inside"
+
+
+def regime_rows(day: Day, registry: Path, key_s: int = KEY_S,
+                split_ns: int = SPLIT_NS, script: str = SCRIPT) -> list[dict]:
+    """Every regime fit, each logged the moment it exists. Nothing here
+    prints."""
+    ps = day.pairs_at(key_s)
+    rows = []
+    for rg in regimes(ps, split_ns):
+        fit, test = leave_out(ps, rg)
+        split_name = f"all-but-{rg.kind}/{rg.kind}"
+        for predictor in PREDICTORS:
+            f = evaluate(fit, test, predictor)
+            tid = log_trial(registry, script=script,
+                            question=QUESTIONS[predictor] + f" ({rg.name} regime, fitted outside it)",
+                            ticker=day.ticker, date=DATE, clock="calendar", bucket=key_s,
+                            horizon=key_s, window=rg.label if rg.kind == "window" else rg.name,
+                            split=split_name, n_obs=f.n_test, metric="hit_rate",
+                            value=f.hit_rate, status="predictive",
+                            note=note_for(f) + f"; verdict={verdict_word(f)}; "
+                                 f"regime={rg.label}; level {day.level}")
+            rows.append({"regime": rg.name, "kind": rg.kind, "label": rg.label,
+                         "horizon_s": key_s, "predictor": predictor, "n_fit": f.n_fit,
+                         "n_test": f.n_test, "beta": slope(f), "t_stat": f.t_stat,
+                         "r2_oos": f.r2_oos, "hits": f.hits, "both_nonzero": f.both_nonzero,
+                         "excluded": f.excluded, "hit_rate": f.hit_rate, "z": f.z,
+                         "band": f.band, "verdict": verdict_word(f),
+                         "edge_cents": f.edge_cents, "n_signals": f.n_signals,
+                         "trial_id": tid})
+    return rows
+
+
+def print_regimes(rows: list[dict], ticker: str) -> None:
+    ids = [r["trial_id"] for r in rows]
+    print(f"REGIMES {ticker} {DATE}: {hlabel(rows[0]['horizon_s'])} horizon, each regime "
+          f"fitted on its complement and tested inside; registry rows #{min(ids)} to #{max(ids)}")
+    print(f"  {'regime':<9} {'pred':<5} {'n_fit':>6} {'n_test':>6} {'slope':>9} {'t':>6} "
+          f"{'R2 oos':>8} {'hit rate':>9} {'band':>7} {'z':>6} {'verdict':<8} {'edge c':>8} trial")
+    for r in rows:
+        print(f"  {r['regime']:<9} {r['predictor']:<5} {r['n_fit']:>6,} {r['n_test']:>6,} "
+              f"{fmt(r['beta'], 4, True):>9} {fmt(r['t_stat'], 1):>6} {fmt(r['r2_oos'], 4, True):>8} "
+              f"{pct(r['hit_rate']):>9} {('+/-' + pct(r['band'])) if r['band'] is not None else 'n/a':>7} "
+              f"{fmt(r['z'], 1, True):>6} {r['verdict']:<8} {fmt(r['edge_cents'], 3, True):>8} "
+              f"#{r['trial_id']}")
+    labels = {r["regime"]: r["label"] for r in rows}
+    for name, label in labels.items():
+        print(f"    {name}: {label}")
+
+
+def part_regimes(args, day: Day, registry: Path, out: Path) -> list[dict]:
+    rows = regime_rows(day, registry, key_s=KEY_S, split_ns=SPLIT_NS)
+    # everything is logged; now, and only now, the numbers may be seen
+    print_regimes(rows, day.ticker)
+    target = out / f"ofi_regimes_{day.ticker}.csv"
+    write_csv(rows, REGIME_COLUMNS, target)
+    print(f"\n  wrote {target} ({len(rows)} rows)")
+    return rows
+
+
 # --------------------------------------------------------------- main
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -223,6 +299,8 @@ def main() -> None:
     out, registry = Path(args.out), Path(args.registry)
     if args.part == "decay":
         part_decay(args, load(args), registry, out)
+    elif args.part == "regimes":
+        part_regimes(args, load(args), registry, out)
     else:
         raise SystemExit(f"--part {args.part} is built in a later step")
 
