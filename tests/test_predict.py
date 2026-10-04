@@ -340,3 +340,35 @@ def test_every_verdict_is_logged_before_anything_prints_and_the_sentence_reads(t
     cleared = [r for r in decay if r["direction"] == "primary" and r["predictor"] == "ofi"
                and r["clears_band"] == "True"]
     assert ("does not predict" in seen["line"]) == (not cleared)
+
+
+# -------------------------------------------------------------- writeup
+def test_the_writeup_reads_the_csvs_and_adds_no_registry_row(tmp_path, monkeypatch, capsys):
+    import types
+    msgs, ref = _fake_day(tmp_path)
+    evs = list(events(touches(msgs, ref)))
+    day = op.Day("FAKE", 10, msgs, ref, evs)
+    registry = tmp_path / "trials.csv"
+    monkeypatch.setattr(op, "HORIZONS_S", (0.25, 0.5, 1.0))
+    monkeypatch.setattr(op, "SPLIT_NS", OPEN_NS + 4 * NS)
+    monkeypatch.setattr(op, "KEY_S", 0.5)
+    op.part_decay(None, day, registry, tmp_path)
+    op.part_regimes(None, day, registry, tmp_path)
+    op.part_cost(None, day, registry, tmp_path)
+    n = count(registry)
+    assert n == 12 + 10 + 12
+    page = tmp_path / "ofi_prediction.md"
+    page.write_text("# my prose\n\nkept above\n\n<!-- prediction:begin -->\nold\n<!-- prediction:end -->\n\nkept below\n")
+    op.part_writeup(types.SimpleNamespace(figure=False), tmp_path, "FAKE")
+    assert count(registry) == n                          # the write-up logs nothing
+    text = page.read_text()
+    assert text.startswith("# my prose") and "kept below" in text and "old" not in text
+    assert "The sentence, with its numbers" in text
+    for i in range(1, n + 1):
+        assert f"#{i}" in text                            # every trial id on the page
+    decay = op.read_csv(tmp_path / "ofi_decay_FAKE.csv")
+    regimes_ = op.read_csv(tmp_path / "ofi_regimes_FAKE.csv")
+    cost = op.read_csv(tmp_path / "ofi_cost_FAKE.csv")
+    grades = op.grade(decay, regimes_, cost)
+    assert len(grades) == 9 and all(g[0] in (True, False, None) for g in grades)
+    assert "spliced" in capsys.readouterr().out

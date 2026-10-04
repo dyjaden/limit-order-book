@@ -87,6 +87,30 @@ it runs. Write-up with the expectations graded:
 
 ![Price change against order flow imbalance inside the same interval, AAPL 2012-06-21](results/figures/ofi_first_look.png)
 
+Then the question itself, defined in full before it ran: does the
+imbalance over the **last** interval say anything about the mid change
+over the **next** one? Fit through the origin on the first half of the
+day, tested on the second (and the reverse), against the zero forecast
+and the last mid change as baselines, at 1, 5, 10, 30 seconds, 1 and 5
+minutes, every one of the 58 fits a registry row before it was a
+number. **The answer: OFI predicts the next interval's mid change at a
+horizon of 5 seconds with a hit rate of 54.3% (plus or minus 2.3
+points), and the edge is consumed by half the spread 11 times over,
+0.59 cents gross per signal against a half-spread of 6.5 cents.** At one
+second the direction is right 55.7% of the time on the afternoon and
+49.5% on the morning, so only the five-second result survives the
+reversed split; nothing clears a coin's band from ten seconds on; the
+out-of-sample R-squared is under 0.7% everywhere; the predictive slope
+is an eighth of the contemporaneous one. The one regime where the
+ten-second signal clears its band is the quiet decile of trailing
+variance (63.6% of 264 calls), and the strongest decile of one-second
+signals is right 66% of the time and still 5.6 times short of the
+half-spread. Four of the nine expectations written before the run
+held and five failed, each failure named. Write-up and tables:
+[`results/ofi_prediction.md`](results/ofi_prediction.md).
+
+![Does last-interval OFI predict the next interval? AAPL 2012-06-21](results/figures/ofi_prediction.png)
+
 ## Status
 
 Week 1 (2 September 2026): the book core, its invariant suite, and a
@@ -112,10 +136,14 @@ Week 5 (2 to 3 October): order flow imbalance from the touch, the two
 clocks, the trial registry (append-only, a number logged before it is
 printed), and the contemporaneous first look, graded against the
 expectations written before the run and reported as descriptive.
-**118 tests passing**, CI green on every push. Next is Week 6, the
-thesis week: the predictive question (next-interval mid change at six
-horizons, a time split, a baseline, the cost against half the spread),
-defined in the registry first and then run.
+Week 6 (4 October): the honest evaluation, the predictive question
+frozen before it ran, six horizons out of sample in both split
+directions, five regimes, the cost verdict against the half-spread at
+the time, and the sentence with its numbers; 58 more registry rows.
+**129 tests passing**, CI green on every push. Next is Week 7: the same
+OFI analysis on a less liquid name (MSFT, when LOBSTER grants the
+request), then WRDS TAQ spreads for the backtester's names and the
+audit of its one-basis-point assumption.
 
 ## Design commitments, stated before the results exist
 
@@ -142,7 +170,7 @@ cd limit-order-book
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python -m pytest -q                  # 118 passed
+python -m pytest -q                  # 129 passed
 python scripts/make_fake_tape.py     # 100k synthetic messages, invariants
                                      # checked at every step
 python scripts/make_fake_itch.py     # the same fiction as ITCH 5.0 bytes,
@@ -173,9 +201,19 @@ python scripts/ofi_report.py --ticker AAPL --figure        # the two-clock figur
 python scripts/ofi_first_look.py --ticker AAPL --figure    # appends 19 rows to results/trials.csv
 ```
 
-The first look logs every regression to the registry before it prints
-it, so each run appends; `python -m lob.registry` says how long the
-file is.
+Week 6, the prediction, in four parts that each log their own trials
+(24, 10 and 24 rows); the write-up and figure read the CSVs and add none:
+
+```bash
+python scripts/ofi_prediction.py --ticker AAPL --part decay
+python scripts/ofi_prediction.py --ticker AAPL --part regimes
+python scripts/ofi_prediction.py --ticker AAPL --part cost
+python scripts/ofi_prediction.py --ticker AAPL --part writeup --figure
+```
+
+Every analysis script logs each regression to the registry before it
+prints it, so each run appends; `python -m lob.registry` says how long
+the file is.
 
 The two LOBSTER scripts (`scripts/replay_lobster.py --level 10
 --validate`) need the free AAPL 2012-06-21 sample files in
@@ -212,10 +250,17 @@ not be believed.
   Its slopes, R-squareds and hit rates pair the flow over an interval
   with the price change inside that same interval, the largest part of
   which the flow itself produced. Nothing in `results/ofi_first_look.md`
-  or above may be read as a forecast; the predictive question is Week
-  6's. The depth elasticity (-1.43) is estimated across a 1.6-fold
-  range of depth on one day and its R-squared of 0.27 says how much to
-  trust it.
+  may be read as a forecast. The depth elasticity (-1.43) is estimated
+  across a 1.6-fold range of depth on one day and its R-squared of 0.27
+  says how much to trust it.
+- **The prediction result is one day, split within itself.** The fit is
+  the morning and the test the afternoon (and the reverse); the two
+  directions disagree at one second and agree at five, which is the
+  measure of how much a second day could change. The cost verdict is
+  optimistic by construction (zero latency, a passive exit at the mid,
+  no fees, no queue, no impact) and the edge still loses by an order of
+  magnitude; rows with fewer than a hundred signals are marked as noise
+  in the tables and reported only because they were logged.
 - **The per-event OFI series is regenerated, not shipped.** At one row
   per message it is a transformed copy of licensed data;
   `scripts/ofi_report.py` rebuilds it in seconds from the LOBSTER files.
