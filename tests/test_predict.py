@@ -256,3 +256,87 @@ def test_every_regime_fit_is_logged_before_anything_prints(tmp_path, monkeypatch
                                                      "all-but-decile/decile"}
     assert {r["verdict"] for r in rows} <= {"above", "inside", "below", "no call"}
     assert "REGIMES" in capsys.readouterr().out
+
+
+# ------------------------------------------------------- the cost verdict
+def test_cost_verdict_by_hand_all_signals_and_the_top_decile():
+    from lob.predict import cost_verdict
+    # fit set only supplies the decile cut on |x|: 90th percentile of {100..1000}
+    fit = [P(100 * i, 0.0, t=10 * i) for i in range(1, 11)]
+    # six consecutive test pairs, beta positive: long when x > 0
+    test = [P(+100, +2.0, hs=5.0, t=100),     # right, beats 5
+            P(-100, +1.0, hs=5.0, t=110),     # short, wrong: -1.0
+            P(+900, +8.0, hs=6.0, t=120),     # right, beats 6 (top decile)
+            P(0, +9.0, hs=5.0, t=130),        # no signal
+            P(-950, -3.0, hs=4.0, t=140),     # short, right: +3.0 (top decile)
+            P(+100, 0.0, hs=None, t=150)]     # right direction unknowable, no spread
+    v = cost_verdict(fit, test, beta=0.01)
+    assert v.horizon_s == 10 and v.subset == "all" and v.latency == 0
+    assert v.n_signals == 5 and (v.hits, v.both_nonzero) == (3, 4)
+    assert v.gross_cents == pytest.approx((2.0 - 1.0 + 8.0 + 3.0 + 0.0) / 5)
+    assert v.half_spread_cents == pytest.approx((5 + 5 + 6 + 4) / 4)
+    assert v.net_one_leg == pytest.approx(((2 - 5) + (-1 - 5) + (8 - 6) + (3 - 4)) / 4)
+    assert v.net_two_legs == pytest.approx(((2 - 10) + (-1 - 10) + (8 - 12) + (3 - 8)) / 4)
+    assert v.beat_half_spread == pytest.approx(1 / 4)       # only the 8-cent move beat its 6
+    assert v.consumed == pytest.approx(v.half_spread_cents / v.gross_cents)
+    top = cost_verdict(fit, test, beta=0.01, subset="top-decile")
+    assert top.threshold == 900                             # from the fit set, nearest rank
+    assert top.n_signals == 2 and top.gross_cents == pytest.approx((8.0 + 3.0) / 2)
+    assert top.hit_rate == 1.0 and top.beat_half_spread == 0.5
+    # a negative beta flips every direction
+    neg = cost_verdict(fit, test, beta=-0.01)
+    assert neg.gross_cents == pytest.approx(-v.gross_cents)
+    assert neg.consumed is None                             # no ratio for a losing edge
+
+
+def test_cost_verdict_with_latency_shifts_the_move_and_the_spread_by_one_bucket():
+    from lob.predict import cost_verdict
+    test = [P(+100, +1.0, hs=2.0, t=0), P(+100, -3.0, hs=4.0, t=10),
+            P(-100, +5.0, hs=6.0, t=20), P(+100, +7.0, hs=8.0, t=30)]
+    lag = cost_verdict([], test, beta=1.0, latency=1)
+    # signal at t=0 (long) realizes the t=10 pair's move (-3) at its spread (4);
+    # t=10 (long) realizes +5 at 6; t=20 (short) realizes -7 at 8; t=30 has no next
+    assert lag.n_signals == 3
+    assert lag.gross_cents == pytest.approx((-3.0 + 5.0 - 7.0) / 3)
+    assert lag.half_spread_cents == pytest.approx((4 + 6 + 8) / 3)
+    # a gap in the series means no entry bucket for the signal before it
+    gapped = test[:2] + [P(-100, +5.0, hs=6.0, t=40)]
+    assert cost_verdict([], gapped, beta=1.0, latency=1).n_signals == 1
+    with pytest.raises(ValueError):
+        cost_verdict([], test, beta=1.0, latency=2)
+    with pytest.raises(ValueError):
+        cost_verdict([], test, beta=1.0, subset="bottom")
+    empty = cost_verdict([], [], beta=1.0, subset="top-decile")
+    assert empty.n_signals == 0 and empty.gross_cents is None and empty.threshold is None
+
+
+def test_every_verdict_is_logged_before_anything_prints_and_the_sentence_reads(tmp_path, monkeypatch, capsys):
+    msgs, ref = _fake_day(tmp_path)
+    evs = list(events(touches(msgs, ref)))
+    day = op.Day("FAKE", 10, msgs, ref, evs)
+    registry = tmp_path / "trials.csv"
+    monkeypatch.setattr(op, "HORIZONS_S", (0.25, 0.5, 1.0))
+    monkeypatch.setattr(op, "SPLIT_NS", OPEN_NS + 4 * NS)
+    op.part_decay(None, day, registry, tmp_path)           # the cost part reads its CSV
+    n_before = count(registry)
+    seen = {}
+    real_print = op.print_cost
+
+    def spy_print(rows, ticker, line):
+        seen["at_print"] = count(registry)
+        seen["line"] = line
+        return real_print(rows, ticker, line)
+    monkeypatch.setattr(op, "print_cost", spy_print)
+    rows = op.part_cost(None, day, registry, tmp_path)
+    expected = 3 * 2 * 2
+    assert len(rows) == expected and seen["at_print"] == n_before + expected
+    assert {r["subset"] for r in rows} == {"all", "top-decile"}
+    assert {int(r["latency"]) for r in rows} == {0, 1}
+    assert all(r["beta_trial_id"] for r in rows)
+    assert seen["line"].startswith("OFI")
+    assert "COST VERDICT" in capsys.readouterr().out
+    # the sentence names a horizon only when a hit rate cleared the band
+    decay = op.read_csv(tmp_path / "ofi_decay_FAKE.csv")
+    cleared = [r for r in decay if r["direction"] == "primary" and r["predictor"] == "ofi"
+               and r["clears_band"] == "True"]
+    assert ("does not predict" in seen["line"]) == (not cleared)

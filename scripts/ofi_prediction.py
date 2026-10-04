@@ -43,7 +43,8 @@ from lob.lobster import read_messages, read_orderbook
 from lob.micro import NS, hms, time_weighted
 from lob.ofi import aggregate_calendar, events, touches
 from lob.predict import (HORIZONS_S, KEY_S, PREDICTORS, SPLIT_NS, Forecast,
-                         Pair, evaluate, leave_out, pairs, regimes, split)
+                         Pair, Verdict, cost_verdict, evaluate, leave_out, pairs,
+                         regimes, split)
 from lob.registry import REGISTRY, log_trial
 
 SCRIPT = "ofi_prediction.py"
@@ -284,6 +285,120 @@ def part_regimes(args, day: Day, registry: Path, out: Path) -> list[dict]:
     return rows
 
 
+# --------------------------------------------------------------- cost
+COST_COLUMNS = ("horizon_s", "subset", "latency", "threshold", "n_signals", "hits",
+                "both_nonzero", "hit_rate", "gross_cents", "half_spread_cents",
+                "net_one_leg", "net_two_legs", "beat_half_spread", "consumed",
+                "beta_trial_id", "trial_id")
+SUBSETS = ("all", "top-decile")
+LATENCIES = (0, 1)
+
+
+def decay_betas(decay_rows: list[dict]) -> dict[float, tuple[float, str, bool]]:
+    """Per horizon: the primary-split OFI slope (cents per share), the
+    trial id it was logged under, and whether its hit rate cleared the
+    band; read from the decay CSV so the verdict never refits."""
+    out = {}
+    for r in decay_rows:
+        if r["direction"] == "primary" and r["predictor"] == "ofi" and r["beta"]:
+            out[float(r["horizon_s"])] = (float(r["beta"]) / KSH, r["trial_id"],
+                                          str(r["clears_band"]) == "True")
+    return out
+
+
+def cost_rows(day: Day, registry: Path, betas: dict, horizons=HORIZONS_S,
+              split_ns: int = SPLIT_NS, script: str = SCRIPT) -> list[dict]:
+    """Every verdict, each logged the moment it exists. Nothing here
+    prints."""
+    rows = []
+    for h in horizons:
+        if float(h) not in betas:
+            continue
+        beta, beta_trial, _ = betas[float(h)]
+        fit, test = split(day.pairs_at(h), split_ns)
+        for subset in SUBSETS:
+            for latency in LATENCIES:
+                v = cost_verdict(fit, test, beta, subset, latency)
+                tid = log_trial(
+                    registry, script=script,
+                    question=(f"cost: gross edge per signal of trading sign(beta x) from trial "
+                              f"#{beta_trial}, {subset} signals, latency {latency} bucket(s), "
+                              f"against the half-spread at entry"),
+                    ticker=day.ticker, date=DATE, clock="calendar", bucket=h, horizon=h,
+                    window="12:45-16:00", split="first-half/second-half", n_obs=v.n_signals,
+                    metric="gross_edge_cents", value=v.gross_cents, status="predictive",
+                    note=(f"half_spread={fmt(v.half_spread_cents, 4)} cents; "
+                          f"net_one_leg={fmt(v.net_one_leg, 4)}; net_two_legs={fmt(v.net_two_legs, 4)}; "
+                          f"beat_half_spread={fmt(v.beat_half_spread, 4)}; "
+                          f"consumed={fmt(v.consumed, 2)}x; hit_rate={fmt(v.hit_rate, 4)} over "
+                          f"{v.both_nonzero}; threshold={fmt(v.threshold, 0)} shares; level {day.level}"))
+                rows.append({"horizon_s": h, "subset": subset, "latency": latency,
+                             "threshold": v.threshold, "n_signals": v.n_signals,
+                             "hits": v.hits, "both_nonzero": v.both_nonzero,
+                             "hit_rate": v.hit_rate, "gross_cents": v.gross_cents,
+                             "half_spread_cents": v.half_spread_cents,
+                             "net_one_leg": v.net_one_leg, "net_two_legs": v.net_two_legs,
+                             "beat_half_spread": v.beat_half_spread, "consumed": v.consumed,
+                             "beta_trial_id": beta_trial, "trial_id": tid})
+    return rows
+
+
+def sentence(decay: list[dict], cost: list[dict]) -> str:
+    """The deliverable sentence with X, Y and Z from the run: the
+    horizon with the largest gross edge among those whose primary-split
+    hit rate cleared the band, or the plain statement that none did."""
+    cleared = {float(r["horizon_s"]): r for r in decay
+               if r["direction"] == "primary" and r["predictor"] == "ofi"
+               and str(r["clears_band"]) == "True"}
+    if not cleared:
+        return ("OFI does not predict the next interval's mid change at any horizon "
+                "from one second to five minutes on this day: no hit rate clears the "
+                "95% band around one half.")
+    best = max((r for r in cost if r["subset"] == "all" and int(r["latency"]) == 0
+                and float(r["horizon_s"]) in cleared and r["gross_cents"] is not None),
+               key=lambda r: float(r["gross_cents"]))
+    d = cleared[float(best["horizon_s"])]
+    return (f"OFI predicts the next interval's mid change at a horizon of "
+            f"{hlabel(best['horizon_s'])} with a hit rate of {pct(float(d['hit_rate']))} "
+            f"(plus or minus {pct(float(d['band']))}), and the edge is consumed by half the "
+            f"spread {float(best['consumed']):.0f} times over: {float(best['gross_cents']):.2f} "
+            f"cents gross per signal against a half-spread of "
+            f"{float(best['half_spread_cents']):.1f} cents.")
+
+
+def print_cost(rows: list[dict], ticker: str, line: str) -> None:
+    ids = [r["trial_id"] for r in rows]
+    print(f"COST VERDICT {ticker} {DATE}: test half only, entered at the end of the signal's "
+          f"bucket (latency 0) or one bucket later (latency 1); registry rows #{min(ids)} to #{max(ids)}")
+    print(f"  {'horizon':<8} {'subset':<10} {'lat':>3} {'signals':>7} {'hit rate':>9} "
+          f"{'gross c':>8} {'half spr':>9} {'net 1 leg':>10} {'net 2 legs':>11} "
+          f"{'beat %':>7} {'consumed':>9} trial")
+    for r in rows:
+        print(f"  {hlabel(r['horizon_s']):<8} {r['subset']:<10} {r['latency']:>3} "
+              f"{r['n_signals']:>7,} {pct(r['hit_rate']):>9} {fmt(r['gross_cents'], 3, True):>8} "
+              f"{fmt(r['half_spread_cents'], 2):>9} {fmt(r['net_one_leg'], 3, True):>10} "
+              f"{fmt(r['net_two_legs'], 3, True):>11} {pct(r['beat_half_spread'], 0):>7} "
+              f"{(fmt(r['consumed'], 1) + 'x') if r['consumed'] is not None else 'n/a':>9} "
+              f"#{r['trial_id']}")
+    print("\n  gross and nets in cents per signal; consumed = half-spread over gross edge")
+    print(f"\n  {line}")
+
+
+def part_cost(args, day: Day, registry: Path, out: Path) -> list[dict]:
+    decay_path = out / f"ofi_decay_{day.ticker}.csv"
+    if not decay_path.exists():
+        raise SystemExit(f"no {decay_path}; run --part decay first")
+    decay = read_csv(decay_path)
+    rows = cost_rows(day, registry, decay_betas(decay), horizons=HORIZONS_S,
+                     split_ns=SPLIT_NS)
+    # everything is logged; now, and only now, the numbers may be seen
+    print_cost(rows, day.ticker, sentence(decay, rows))
+    target = out / f"ofi_cost_{day.ticker}.csv"
+    write_csv(rows, COST_COLUMNS, target)
+    print(f"\n  wrote {target} ({len(rows)} rows)")
+    return rows
+
+
 # --------------------------------------------------------------- main
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -301,6 +416,8 @@ def main() -> None:
         part_decay(args, load(args), registry, out)
     elif args.part == "regimes":
         part_regimes(args, load(args), registry, out)
+    elif args.part == "cost":
+        part_cost(args, load(args), registry, out)
     else:
         raise SystemExit(f"--part {args.part} is built in a later step")
 

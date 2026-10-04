@@ -260,3 +260,95 @@ def leave_out(pairs: Iterable[Pair], regime: Regime) -> tuple[list[Pair], list[P
     pairs = list(pairs)
     return ([p for p in pairs if not regime.member(p)],
             [p for p in pairs if regime.member(p)])
+
+
+# -------------------------------------------------------- the cost verdict
+@dataclass(frozen=True)
+class Verdict:
+    """The gross edge of trading the signal beside the half-spread it
+    would have paid, for one horizon, one subset of signals and one
+    latency. Gross is the mean realized move in the forecast direction
+    per signal, in cents; the half-spread is the time-weighted one of
+    the bucket in which the trade is entered; the nets subtract one and
+    two aggressive legs; ``beat_half_spread`` is the share of signals
+    whose own move exceeded their own half-spread."""
+    horizon_s: float
+    subset: str                  # 'all' | 'top-decile'
+    latency: int                 # buckets of delay before entry
+    threshold: float | None      # |x| cut for the top decile, from the fit set
+    n_signals: int
+    hits: int
+    both_nonzero: int
+    gross_cents: float | None
+    half_spread_cents: float | None
+    net_one_leg: float | None
+    net_two_legs: float | None
+    beat_half_spread: float | None
+
+    @property
+    def hit_rate(self) -> float | None:
+        return self.hits / self.both_nonzero if self.both_nonzero else None
+
+    @property
+    def consumed(self) -> float | None:
+        """How many times over the half-spread eats the gross edge; None
+        when the gross edge is not positive, which needs no ratio."""
+        if self.gross_cents is None or self.gross_cents <= 0 or not self.half_spread_cents:
+            return None
+        return self.half_spread_cents / self.gross_cents
+
+
+def cost_verdict(fit: Iterable[Pair], test: Iterable[Pair], beta: float,
+                 subset: str = "all", latency: int = 0,
+                 decile: float = DECILE) -> Verdict:
+    """Trade every signal in the test set in the direction sign(beta x),
+    entering at the end of the forecast bucket (latency 0) or one bucket
+    later (latency 1), holding one bucket. The top-decile threshold on
+    |x| comes from the fit set. Pairs must be in time order; with
+    latency, a signal whose entry bucket is missing is skipped."""
+    if subset not in ("all", "top-decile"):
+        raise ValueError(f"unknown subset {subset!r}")
+    if latency not in (0, 1):
+        raise ValueError("latency is 0 or 1 buckets")
+    fit, test = list(fit), list(test)
+    threshold = None
+    if subset == "top-decile":
+        sizes = [abs(p.x) for p in fit if p.x]
+        if not sizes:
+            return Verdict(0, subset, latency, None, 0, 0, 0, None, None, None, None, None)
+        threshold = _nearest_rank(sizes, 1 - decile)
+    h = (test[0].target_end_ns - test[0].time_ns) if test else 0
+    n = hits = both = 0
+    gross = 0.0
+    n_hs = beat = 0
+    hs_sum = net1 = net2 = 0.0
+    for i, p in enumerate(test):
+        if not p.x or not beta or (threshold is not None and abs(p.x) < threshold):
+            continue
+        j = i + latency
+        if j >= len(test):
+            continue
+        q = test[j]
+        if q.time_ns != p.time_ns + latency * h:
+            continue                                     # a gap: no entry bucket
+        direction = 1 if beta * p.x > 0 else -1
+        move = direction * q.y
+        n += 1
+        gross += move
+        if q.y:
+            both += 1
+            if move > 0:
+                hits += 1
+        if q.half_spread is not None:
+            n_hs += 1
+            hs_sum += q.half_spread
+            net1 += move - q.half_spread
+            net2 += move - 2 * q.half_spread
+            if move > q.half_spread:
+                beat += 1
+    return Verdict(h / 10**9, subset, latency, threshold, n, hits, both,
+                   gross / n if n else None,
+                   hs_sum / n_hs if n_hs else None,
+                   net1 / n_hs if n_hs else None,
+                   net2 / n_hs if n_hs else None,
+                   beat / n_hs if n_hs else None)
