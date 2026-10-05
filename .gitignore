@@ -35,6 +35,9 @@ results/*
 !results/ofi_regimes_*.csv
 !results/ofi_cost_*.csv
 !results/ofi_prediction.md
+!results/liquidity_spectrum.csv
+!results/liquidity_compare.csv
+!results/liquidity_spectrum.md
 
 # Cowork's delivery folder inside the working copy: vault documents, not repo files
 Claude outputs/

@@ -238,13 +238,14 @@ def _num(text: str) -> float | None:
         return None
 
 
-def read_midas(folder: Path, tickers: set[str],
+def read_midas(folder: Path, tickers: set[str] | None,
                date: str = "2012-06-21") -> dict[str, dict]:
-    """The rows for `tickers` on `date` from every delimited file under
-    `folder`. Header names are matched case-insensitively for the ticker
-    and date columns; the delimiter is sniffed; the date may be in any
-    of the formats MIDAS has used; the ('000) columns are converted to
-    shares, so every number in the record is a count or a share count."""
+    """The rows for `tickers` on `date` (every ticker when `tickers` is
+    None) from every delimited file under `folder`. Header names are
+    matched case-insensitively for the ticker and date columns; the
+    delimiter is sniffed; the date may be in any of the formats MIDAS
+    has used; the ('000) columns are converted to shares, so every
+    number in the record is a count or a share count."""
     found: dict[str, dict] = {}
     files = sorted(p for p in Path(folder).rglob("*")
                    if p.suffix.lower() in (".csv", ".txt", ".psv", ".tsv"))
@@ -265,7 +266,7 @@ def read_midas(folder: Path, tickers: set[str],
                 if len(row) <= max(it, id_):
                     continue
                 ticker = row[it].strip().upper()
-                if ticker not in tickers or norm_date(row[id_]) != date:
+                if (tickers is not None and ticker not in tickers) or norm_date(row[id_]) != date:
                     continue
                 rec: dict = {}
                 for i in range(min(len(header), len(row))):
