@@ -50,6 +50,18 @@ from pathlib import Path
 
 from lob.taq import NS, Quote, Trade, summarize_name
 
+
+def missing(x) -> bool:
+    """True for None, NaN and pandas' NA and NaT, which are not falsy
+    and refuse a truth test; every value that comes back from WRDS goes
+    through here before it is used. No pandas import: the check works
+    on the type's name, so the measurement path never needs pandas."""
+    if x is None:
+        return True
+    if isinstance(x, float) and x != x:
+        return True
+    return type(x).__name__ in ("NAType", "NaTType")
+
 OPEN_NS, CLOSE_NS = 34_200 * NS, 57_600 * NS
 BAD_CONDITIONS = set("OZBTLGWJK")       # Holden and Jacobsen's exclusions for 2012-era TAQ
 TAQ_NOTE = ("consolidated tape, regular hours, round lots only (the 2012 tape excludes "
@@ -74,6 +86,19 @@ def nbbo_path(cache: Path, date: str, ticker: str) -> Path:
 
 def trades_path(cache: Path, date: str, ticker: str) -> Path:
     return cache_dir(cache, date) / f"{ticker}_trades.csv.gz"
+
+
+def done_path(cache: Path, date: str, ticker: str) -> Path:
+    return cache_dir(cache, date) / f"{ticker}.done"
+
+
+def cached(cache: Path, date: str, ticker: str) -> bool:
+    """A name is cached only when its marker says both files were
+    written to the end; a pull interrupted halfway leaves no marker and
+    is redone."""
+    return (done_path(cache, date, ticker).exists()
+            and nbbo_path(cache, date, ticker).exists()
+            and trades_path(cache, date, ticker).exists())
 
 
 def universe_path(cache: Path, date: str) -> Path:
@@ -120,11 +145,11 @@ def sp500_universe(db, date: str) -> list[dict]:
     out = []
     seen = set()
     for r in rows.itertuples(index=False):
-        if r.permno in seen or r.ticker is None:
+        if r.permno in seen or missing(r.ticker):
             continue
         seen.add(r.permno)
-        close = None if r.close is None else abs(float(r.close))
-        vol = None if r.volume is None else float(r.volume)
+        close = None if missing(r.close) else abs(float(r.close))
+        vol = None if missing(r.volume) else float(r.volume)
         out.append({"permno": int(r.permno), "ticker": str(r.ticker).strip().upper(),
                     "close": close, "volume": vol,
                     "dollar_volume": (close * vol) if close is not None and vol is not None else None})
@@ -204,22 +229,34 @@ def pull_name(db, date: str, ticker: str, cache: Path) -> tuple[int, int]:
               AND tr_corr = '00'
             ORDER BY time_m
         """, params={"root": root, "suffix": suffix})
-        with gzip.open(nbbo_path(cache, date, ticker), "wt", newline="") as f:
+        npath, tpath = nbbo_path(cache, date, ticker), trades_path(cache, date, ticker)
+        tmp_n, tmp_t = npath.with_suffix(".part"), tpath.with_suffix(".part")
+        nq = 0
+        with gzip.open(tmp_n, "wt", newline="") as f:
             w = csv.writer(f, lineterminator="\n")
             w.writerow(["time_ns", "bid", "ask"])
             for r in q.itertuples(index=False):
+                if missing(r.time_m) or missing(r.best_bid) or missing(r.best_ask):
+                    continue
                 w.writerow([time_to_ns(r.time_m), r.best_bid, r.best_ask])
+                nq += 1
         kept = 0
-        with gzip.open(trades_path(cache, date, ticker), "wt", newline="") as f:
+        with gzip.open(tmp_t, "wt", newline="") as f:
             w = csv.writer(f, lineterminator="\n")
             w.writerow(["time_ns", "price", "size"])
             for r in t.itertuples(index=False):
-                cond = (r.tr_scond or "").strip()
+                if missing(r.time_m) or missing(r.price) or missing(r.size):
+                    continue
+                cond = "" if missing(r.tr_scond) else str(r.tr_scond).strip()
                 if any(c in BAD_CONDITIONS for c in cond):
                     continue
                 w.writerow([time_to_ns(r.time_m), r.price, r.size])
                 kept += 1
-        return len(q), kept
+        # both files complete: give them their final names, then the marker
+        tmp_n.replace(npath)
+        tmp_t.replace(tpath)
+        done_path(cache, date, ticker).write_text(f"{nq} nbbo rows, {kept} trades\n")
+        return nq, kept
     return 0, 0
 
 
@@ -375,7 +412,7 @@ def write_rows(rows: list[dict], path: Path) -> None:
 def compute(args, cache: Path, out: Path, meta: dict[str, dict]) -> list[dict]:
     rows = []
     for ticker in sorted(meta):
-        if not (nbbo_path(cache, args.date, ticker).exists() and trades_path(cache, args.date, ticker).exists()):
+        if not cached(cache, args.date, ticker):
             print(f"  {ticker}: not cached, skipped", file=sys.stderr)
             continue
         rows.append(measure(cache, args.date, ticker, meta[ticker], int(args.horizon * NS)))
@@ -411,7 +448,7 @@ def main() -> None:
         if upath.exists():
             meta = {u["ticker"]: u for u in read_universe(upath) if u["chosen"]}
         else:
-            meta = {p.name[:-len("_nbbo.csv.gz")]: {} for p in cache_dir(cache, args.date).glob("*_nbbo.csv.gz")}
+            meta = {p.name[:-len(".done")]: {} for p in cache_dir(cache, args.date).glob("*.done")}
         compute(args, cache, out, meta)
         return
 
@@ -434,7 +471,7 @@ def main() -> None:
         else:
             raise SystemExit("give --sp500 or --names")
         for i, ticker in enumerate(sorted(meta), start=1):
-            if nbbo_path(cache, args.date, ticker).exists() and trades_path(cache, args.date, ticker).exists():
+            if cached(cache, args.date, ticker):
                 print(f"  [{i}/{len(meta)}] {ticker}: cached", flush=True)
                 continue
             nq, nt = pull_name(db, args.date, ticker, cache)

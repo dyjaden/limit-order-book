@@ -141,6 +141,10 @@ def test_script_helpers_choose_time_and_measure_from_cache(tmp_path):
     with gzip.open(ts.trades_path(cache, date, "XYZ"), "wt", newline="") as f:
         f.write("time_ns,price,size\n")
         f.write(f"{T0 + 10 * NS},100.10,200\n{T0 + 20 * NS},100.00,100\n{T0 + 400 * NS},100.25,50\n")
+    assert not ts.cached(cache, date, "XYZ")                       # no marker: an interrupted pull
+    ts.done_path(cache, date, "XYZ").write_text("2 nbbo rows, 3 trades\n")
+    assert ts.cached(cache, date, "XYZ")
+    assert ts.missing(None) and ts.missing(float("nan")) and not ts.missing("A") and not ts.missing(0)
     row = ts.measure(cache, date, "XYZ", {"permno": 1, "decile": 7}, 300 * NS)
     assert row["ticker"] == "XYZ" and row["decile"] == 7 and row["trades"] == 3 and row["signed"] == 3
     assert row["effective_bps"] == pytest.approx((2 * 0.05 / 100.05 * BPS * 2 + 0.0) / 3)
