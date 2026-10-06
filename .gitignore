@@ -38,6 +38,8 @@ results/*
 !results/liquidity_spectrum.csv
 !results/liquidity_compare.csv
 !results/liquidity_spectrum.md
+!results/taq_spreads_*.csv
+!results/taq_spreads.md
 
 # Cowork's delivery folder inside the working copy: vault documents, not repo files
 Claude outputs/

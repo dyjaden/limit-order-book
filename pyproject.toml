@@ -8,6 +8,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 analysis = ["matplotlib>=3.8"]
+taq = ["wrds>=3.1"]            # the TAQ pull only; runs where the WRDS credentials live
 
 [build-system]
 requires = ["setuptools>=68"]
