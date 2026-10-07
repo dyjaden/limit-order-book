@@ -433,6 +433,8 @@ def main() -> None:
     ap.add_argument("--sp500", action="store_true", help="the S&P 500 on the date, from CRSP")
     ap.add_argument("--names", default=None, help="a file with one ticker per line")
     ap.add_argument("--per-decile", type=int, default=5, dest="per_decile")
+    ap.add_argument("--also", nargs="+", default=[],
+                    help="members to add to the sample by name (AAPL, to meet Day 4)")
     ap.add_argument("--username", default=None, help="WRDS username (password from .pgpass)")
     ap.add_argument("--cache", default="data/taq")
     ap.add_argument("--out", default="results")
@@ -467,6 +469,15 @@ def main() -> None:
                 write_universe(universe, upath)
                 print(f"  S&P 500 on {args.date}: {len(universe)} members from CRSP, "
                       f"{sum(1 for u in universe if u['chosen'])} chosen, written to {upath}")
+            for t in args.also:
+                hit = next((u for u in universe if u["ticker"] == t.upper()), None)
+                if hit is None:
+                    print(f"  {t.upper()} is not in the universe on {args.date}; skipped", file=sys.stderr)
+                elif not hit["chosen"]:
+                    hit["chosen"] = True
+                    hit["added"] = True
+            if any(u.get("added") for u in universe):
+                write_universe(universe, upath)
             meta = {u["ticker"]: u for u in universe if u["chosen"]}
         else:
             raise SystemExit("give --sp500 or --names")
