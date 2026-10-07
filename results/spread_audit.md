@@ -91,9 +91,9 @@ The README did not say what the plan remembered, and the code does not
 do what the README says. The plan's memory was a one-basis-point cost
 per side. The README states no single figure: it reports the spread
 "across 1-5 bp rather than at a single value", calls the parameter a
-half-spread in every sentence that names it, and the headline
-all-costs-on results run at 1 bp (`results/momentum_baseline.md`: "1 bp
-half-spread"). The code reads the same parameter the other way.
+half-spread where it names the model (lines 73, 271 and 287) and the
+spread where it gives the range, and the headline all-costs-on results
+run at 1 bp (`results/momentum_baseline.md`: "1 bp half-spread"). The code reads the same parameter the other way.
 `HalfSpreadSlippage` documents `spread_bps` as the full quoted spread
 and fills at the mid plus or minus half of it, and its own test pins a
 10 bp setting to a fill of 100.05 on a mid of 100, so the runs labelled
@@ -142,12 +142,13 @@ right and what the error is worth. The backtester's book is fifty names
 equal-weighted by momentum rank, not by liquidity, so the reference is
 the median name of the index rather than its top decile, and for that
 name the spread leg is light by 1.7 times as the README reads it and
-3.4 times as the code charged it. By the README's own sensitivity table
-(net Sharpe 0.58 at a 1 bp parameter, 0.57 at 5 bp), setting the
-parameter to the 3.4 that would charge the median name's 1.70 bps per
-side costs the momentum book under 0.01 Sharpe: the label is off by
-more than the result is, and the README's own conclusion, that costs
-are decided by turnover and not by the cost model, survives its audit.
+3.4 times as the code charged it. By the backtester's own sensitivity
+table (`results/robustness.md`: net Sharpe 0.58 at a 1 bp parameter,
+0.57 at 5 bp), setting the parameter to the 3.4 that would charge the
+median name's 1.70 bps per side costs the momentum book under 0.01
+Sharpe: the label is off by more than the result is, and the README's
+own conclusion, that costs are decided by turnover and not by the cost
+model, survives its audit.
 The citation sentence above carries both numbers so that whoever cites
 it can see which one they are quoting.
 
