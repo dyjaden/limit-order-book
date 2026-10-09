@@ -117,8 +117,10 @@ coal stock); the top decile's median is 1.1 bps and the bottom decile's
 2.7. The first expectation line held in its middle and its top and
 failed at the bottom: the thinnest tenth of the S&P 500 costs under 3
 bps to cross, not 5 to 10, because the thinnest tenth of the S&P 500 is
-still forty million dollars a day, and the long tail the line had in
-mind lives below the index. The deciles are not monotone in the sample
+still about thirty million dollars a day (CRSP's dollar volume for the
+decile's median member is $29 million and its floor $11 million), and
+the long tail the line had in mind lives below the index. The deciles
+are not monotone in the sample
 (the fourth and eighth are wider than their neighbours); five names per
 decile span the distribution without averaging it, and the page says
 so.

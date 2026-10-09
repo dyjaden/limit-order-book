@@ -136,8 +136,8 @@ three times light for the median name" failed both ways, from below at
 the bottom decile" failed at 1 bp (2.7) and held at 0.5 bp (5.5). The
 line was written for a universe with a longer tail than the S&P 500
 has; Step 2 had already found that the thinnest tenth of the index
-trades forty million dollars a day and crosses for under 3 bps, and the
-audit inherits that. What the audit adds is where the assumption is
+trades about thirty million dollars a day and crosses for under 3 bps,
+and the audit inherits that. What the audit adds is where the assumption is
 right and what the error is worth. The backtester's book is fifty names
 equal-weighted by momentum rank, not by liquidity, so the reference is
 the median name of the index rather than its top decile, and for that

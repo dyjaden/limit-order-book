@@ -10,8 +10,9 @@ It is the second project in a sequence. The
 [event-driven-backtester](https://github.com/dyjaden/event-driven-backtester)
 measured why daily-bar backtests lie (survivorship bias: 5.48 pp/yr,
 measured). This one goes a level down, to how prices actually get made.
-Later on, its Week 7 audits the backtester's own spread assumption
-against measured TAQ data, so the two repos end up checking each other.
+Its Week 7 audited the backtester's own spread assumption against
+measured TAQ data, so the two repos now check each other:
+[`results/cross_project_audit.md`](results/cross_project_audit.md).
 
 ## Results (measured, not claimed)
 
@@ -111,6 +112,45 @@ held and five failed, each failure named. Write-up and tables:
 
 ![Does last-interval OFI predict the next interval? AAPL 2012-06-21](results/figures/ofi_prediction.png)
 
+Then the question of scale, in two directions. Down the liquidity
+spectrum first: against the SEC's MIDAS counts for every one of the
+4,939 securities trading that day, AAPL is in the top 2% by lit trades
+and by cancels, and every name LOBSTER's sample offers (MSFT, INTC,
+AMZN, GOOG) is in the top 5%, so the "less liquid" name this project
+can reach through LOBSTER is less liquid than AAPL by a factor of three
+and a half in trades and the long tail is not reachable that way at
+all. The cancel-to-trade expectation failed in direction, because a
+ratio with trades in its denominator ranks the thinnest names highest;
+the side-by-side of Weeks 4 to 6 has one column until the second
+name's files land:
+[`results/liquidity_spectrum.md`](results/liquidity_spectrum.md). Then
+across the backtester's universe, from the consolidated tape: WRDS TAQ
+quotes and trades for fifty S&P 500 names, five from each dollar-volume
+decile of CRSP's membership on the day, plus AAPL, with our own
+Lee-Ready signing and spread arithmetic pinned by hand. **The median
+half effective spread, what a taker paid one way, was 1.7 basis points
+of the mid**, 1.1 in the top decile and 2.7 in the bottom (the thinnest
+tenth of the index still trades about thirty million dollars a day, so
+the 5 to 10 bps written for it failed); the realized spread was negative
+for 23 of the 51 names and the median price impact (3.7 bps) exceeded
+the median effective spread (3.4), so the provider kept almost nothing
+at five minutes; AAPL's NBBO quoted spread was 11.54 cents against the
+15.13 Day 4 measured on Nasdaq alone:
+[`results/taq_spreads.md`](results/taq_spreads.md). Then the audit the
+two repos were pointed at, with the backtester's number read from its
+own README rather than remembered. The README reports its spread
+"across 1-5 bp", its prose calls the parameter a half-spread, and its
+code charges half of it, so the runs labelled 1 bp paid 0.5 bp per
+side; against the tape, **1 bp one way is right for the top
+dollar-volume decile (median 1.13 bps) and nowhere else, 1.7 times
+light for the median name and 2.7 times in the bottom decile, and the
+0.5 bp the code charged is 3.4 and 5.5 times light**, which by the
+backtester's own sensitivity table is under 0.01 Sharpe at its
+turnover: the label is off by more than the result. Twelve registry
+rows, two of four pre-written lines held under each reading, the
+sentence the backtester's README now cites:
+[`results/spread_audit.md`](results/spread_audit.md).
+
 ## Status
 
 Week 1 (2 September 2026): the book core, its invariant suite, and a
@@ -140,10 +180,16 @@ Week 6 (4 October): the honest evaluation, the predictive question
 frozen before it ran, six horizons out of sample in both split
 directions, five regimes, the cost verdict against the half-spread at
 the time, and the sentence with its numbers; 58 more registry rows.
-**129 tests passing**, CI green on every push. Next is Week 7: the same
-OFI analysis on a less liquid name (MSFT, when LOBSTER grants the
-request), then WRDS TAQ spreads for the backtester's names and the
-audit of its one-basis-point assumption.
+Week 7 (5 to 9 October): the five LOBSTER names placed on the SEC's
+spectrum for the day, WRDS TAQ spreads for fifty S&P 500 names plus
+AAPL (quoted, effective, realized, by dollar-volume decile), the audit
+of the backtester's spread assumption read from its own README and
+code, and the cross-project page; 12 more registry rows, 89 in all.
+The second LOBSTER name (GOOG and MSFT requested) is still owed and
+the compare table says so. **146 tests passing**, CI green on every
+push. Next is Week 8, the C++ book, unless the semester bites, in
+which case Weeks 8 and 9 are cut and Week 10's robustness sweep over
+the registry comes next.
 
 ## Design commitments, stated before the results exist
 
@@ -170,7 +216,7 @@ cd limit-order-book
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python -m pytest -q                  # 129 passed
+python -m pytest -q                  # 146 passed
 python scripts/make_fake_tape.py     # 100k synthetic messages, invariants
                                      # checked at every step
 python scripts/make_fake_itch.py     # the same fiction as ITCH 5.0 bytes,
@@ -211,6 +257,22 @@ python scripts/ofi_prediction.py --ticker AAPL --part cost
 python scripts/ofi_prediction.py --ticker AAPL --part writeup --figure
 ```
 
+Week 7. The spectrum needs the MIDAS quarter file in `data/midas/`
+(`results/liquidity_spectrum.md` names it); the TAQ pull needs a WRDS
+account on the machine that runs it (`pip install -e ".[dev,analysis,taq]"`,
+the password in `.pgpass`), and everything after the pull runs from the
+cache with no network; the audit needs the backtester's repo on disk:
+
+```bash
+python scripts/liquidity_spectrum.py --part midas      # the five names on the day's universe
+python scripts/liquidity_spectrum.py --part compare    # one row until the second name lands
+python scripts/taq_spreads.py --date 2012-06-21 --sp500 --per-decile 5 --also AAPL --username <wrds user>
+python scripts/taq_spreads.py --date 2012-06-21 --cache-only            # recompute from data/taq/
+python scripts/spread_audit.py --readme ../event-driven-backtester/README.md \
+    --costs ../event-driven-backtester/src/backtester/costs.py \
+    --quote-also ../event-driven-backtester/results/momentum_baseline.md   # 12 registry rows
+```
+
 Every analysis script logs each regression to the registry before it
 prints it, so each run appends; `python -m lob.registry` says how long
 the file is.
@@ -229,18 +291,20 @@ exists so the machinery is verifiable without any of them.
 Kept explicit from the first commit. A claim without this section should
 not be believed.
 
-- **Real data so far is one ticker on one day**: AAPL, 2012-06-21,
-  from LOBSTER's free sample files. Every real-data number in this
-  README carries that window. The reference validation is a validation
-  of level totals; queue composition inside seeded levels is synthetic
+- **Real order-book data so far is one ticker on one day**: AAPL,
+  2012-06-21, from LOBSTER's free sample files. Every book-level number
+  in this README carries that window; the TAQ sample adds fifty more
+  names on the same day, from the consolidated tape rather than a
+  reconstructed book. The reference validation is a validation of
+  level totals; queue composition inside seeded levels is synthetic
   and is not validated.
 - **The ITCH path has met fixtures and fiction, not yet a real day.**
   The parser is pinned by hand-built bytes for every decoded type and
   round-trips a synthetic day written by our own writer; the real
   TotalView-ITCH day (a 2 to 6 GB download) is still to run, and until
   it does the Week 2 prediction is confirmed on synthetic data only.
-- **The microstructure numbers are one name until MSFT runs.** Every
-  Week 4 statistic is AAPL on one day, time-weighted from the top ten
+- **The microstructure numbers are one name until the second LOBSTER
+  name runs.** Every Week 4 statistic is AAPL on one day, time-weighted from the top ten
   levels of a level-filtered file; order lifetimes are right-censored
   by that filter and say so; depth beyond the tenth level is unknown,
   not zero. Our own replayed book understates depth by 7% at the touch
@@ -265,6 +329,18 @@ not be believed.
   per message it is a transformed copy of licensed data;
   `scripts/ofi_report.py` rebuilds it in seconds from the LOBSTER files.
   The bucket series and the trial registry are committed.
+- **The TAQ spreads are one day and a sample of the index.** Fifty-one
+  names, five per decile, so every decile median is a median of five;
+  round lots only, because the 2012 tape excluded odd lots; the trade
+  direction is Lee and Ready's rule, with its unsigned share reported
+  beside every number. The per-name pulls are cached under `data/`
+  and never ship.
+- **The audit crosses a decade.** The backtester's results are 2015 to
+  2025 and the spreads audited are 2012-06-21's, on the same index; the
+  audit says where the assumption was right on the day the tape was
+  pulled, not across the backtester's window, and its README's prose
+  and code disagree about the parameter by a factor of two, so both
+  readings are reported rather than one chosen.
 - **Throughput is one machine, one Python, whole-run rates.** The
   baseline names its machine and reports medians with spread; it quotes
   no latency percentiles, which wait for Week 9's harness.

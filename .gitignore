@@ -41,6 +41,7 @@ results/*
 !results/taq_spreads_*.csv
 !results/taq_spreads.md
 !results/spread_audit.md
+!results/cross_project_audit.md
 
 # Cowork's delivery folder inside the working copy: vault documents, not repo files
 Claude outputs/
